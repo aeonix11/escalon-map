@@ -23,6 +23,7 @@ export default function DashboardContainer() {
     setMapContext,
     drawerMode,
     setDrawerMode,
+    setSelectedNoteId,
     videoModalOpen,
     closeVideoModal,
     videoModalUrl,
@@ -196,9 +197,14 @@ export default function DashboardContainer() {
           )}
           {!readOnly && (
             <button
-              onClick={() =>
-                setDrawerMode(drawerMode === "notes" ? null : "notes")
-              }
+              onClick={() => {
+                if (drawerMode !== "notes") {
+                  setSelectedNoteId(null);
+                  setDrawerMode("notes");
+                } else {
+                  setDrawerMode(null);
+                }
+              }}
               className={`rounded px-3 py-1.5 text-xs ${
                 drawerMode === "notes"
                   ? "bg-amber-200 text-amber-900 ring-2 ring-amber-300"

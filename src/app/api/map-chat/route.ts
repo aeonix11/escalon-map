@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
-import { narratives, milestones, fragments } from "@/lib/schema";
+import { narratives, milestones, fragments, notes } from "@/lib/schema";
 import { streamMapChat } from "@/lib/anthropic";
-import { serializeMapContext } from "@/lib/mapSerialize";
+import { formatNoteForRetrieval, serializeMapContext } from "@/lib/mapSerialize";
 import {
   bufferToEmbedding,
   cosineSimilarity,
@@ -17,16 +17,18 @@ export async function POST(req: NextRequest) {
   const db = ctx.db;
   const { question } = await req.json();
 
-  const [allNarratives, allMilestones, allFragments] = await Promise.all([
+  const [allNarratives, allMilestones, allFragments, allNotes] = await Promise.all([
     db.select().from(narratives),
     db.select().from(milestones),
     db.select().from(fragments),
+    db.select().from(notes),
   ]);
 
   const fullContext = serializeMapContext(
     allNarratives,
     allMilestones,
-    allFragments
+    allFragments,
+    allNotes
   );
   const estimatedTokens = fullContext.length / CHARS_PER_TOKEN;
 
@@ -61,19 +63,45 @@ export async function POST(req: NextRequest) {
         .sort((a, b) => b.score - a.score)
         .slice(0, 5);
 
+      const questionLower = question.toLowerCase();
+      const questionWords = questionLower.split(/\s+/).filter(Boolean) as string[];
+
       const scoredMilestones = allMilestones
         .map((m) => ({
           text: `[Milestone] ${m.targetDate} ${m.hemisphere} ${m.title}: ${m.description ?? ""}`,
           score: 0,
         }))
         .filter((m) =>
-          m.text.toLowerCase().includes(question.toLowerCase().split(" ")[0])
+          questionWords.some((w) => m.text.toLowerCase().includes(w))
         )
         .slice(0, 10);
+
+      const scoredNotes = allNotes
+        .map((n) => ({
+          text: formatNoteForRetrieval(n),
+          score: 0,
+        }))
+        .filter((n) =>
+          questionWords.some((w) => n.text.toLowerCase().includes(w))
+        )
+        .slice(0, 10);
+
+      const noteContext =
+        scoredNotes.length > 0
+          ? scoredNotes
+          : [...allNotes]
+              .sort((a, b) =>
+                (b.updatedAt || b.createdAt).localeCompare(
+                  a.updatedAt || a.createdAt
+                )
+              )
+              .slice(0, 5)
+              .map((n) => ({ text: formatNoteForRetrieval(n), score: 0 }));
 
       contextText = [
         ...scoredNarratives,
         ...scoredMilestones,
+        ...noteContext,
         ...scoredFragments,
       ]
         .map((s) => s.text)
@@ -83,10 +111,10 @@ export async function POST(req: NextRequest) {
 
   const systemPrompt = `You are an expert analyst of prophetic timelines and geopolitical signals. The user has built a personal prophecy map spanning 2012-2075 with two hemispheres: UPPER_PROPHETIC (visionary/prophetic data above the axis) and LOWER_EARTHLY (real-world confirmed signals below the axis).
 
-Here is the relevant map data:
+Here is the relevant map data (narratives, milestones, notes, and video fragments):
 ${contextText}
 
-Answer the user's question based on this data. Be specific, reference dates, narratives, and patterns. Note gaps and convergences.`;
+Answer the user's question based on this data. Be specific, reference dates, narratives, notes, and patterns. Note gaps and convergences.`;
 
   const stream = await streamMapChat(systemPrompt, question);
 

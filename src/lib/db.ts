@@ -108,6 +108,15 @@ const CREATE_TABLES_SQL = `
     feed_id TEXT REFERENCES rss_feeds(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS deep_analysis_runs (
+    id TEXT PRIMARY KEY,
+    analysis_text TEXT NOT NULL,
+    suggestions_json TEXT NOT NULL DEFAULT '[]',
+    model TEXT,
+    suggestion_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+  );
 `;
 
 function getDiskMtime(dbPath: string): number {
@@ -196,6 +205,17 @@ function runMigrations(sqlite: SqlJsDatabase) {
       hemisphere TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
+    );
+  `);
+
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS deep_analysis_runs (
+      id TEXT PRIMARY KEY,
+      analysis_text TEXT NOT NULL,
+      suggestions_json TEXT NOT NULL DEFAULT '[]',
+      model TEXT,
+      suggestion_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
     );
   `);
 }

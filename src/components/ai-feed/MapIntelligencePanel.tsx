@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useMapChat } from "@/hooks/useMapChat";
 import { useMapDeepAnalysis } from "@/hooks/useMapDeepAnalysis";
+import { useDeepAnalysisHistory } from "@/hooks/useDeepAnalysisHistory";
 import { useMapStore } from "@/store/mapStore";
 import { inputClass } from "@/components/forms/formStyles";
 
@@ -18,8 +19,10 @@ export default function MapIntelligencePanel({
   const { setDrawerMode, milestoneSuggestions } = useMapStore();
   const { messages, loading, contextMode, sendMessage, clearChat } = useMapChat();
   const deep = useMapDeepAnalysis();
+  const history = useDeepAnalysisHistory();
   const [input, setInput] = useState("");
   const [tab, setTab] = useState<"deep" | "chat">("deep");
+  const [deepView, setDeepView] = useState<"current" | "history">("current");
 
   const panelSuggestions =
     milestoneSuggestions.length > 0 ? milestoneSuggestions : deep.suggestions;
@@ -53,7 +56,24 @@ export default function MapIntelligencePanel({
   const handleRunAnalysis = async () => {
     await deep.runDeepAnalysis(async () => {
       await onRefresh?.();
+      if (deepView === "history") {
+        await history.loadHistory();
+      }
     });
+  };
+
+  const openHistory = () => {
+    setDeepView("history");
+    history.clearSelected();
+    void history.loadHistory();
+  };
+
+  const formatRunDate = (iso: string) => {
+    try {
+      return new Date(iso).toLocaleString();
+    } catch {
+      return iso;
+    }
   };
 
   const chatSuggestions = [
@@ -118,6 +138,31 @@ export default function MapIntelligencePanel({
 
       {tab === "deep" ? (
         <>
+          <div className="flex gap-1 border-b border-slate-100 px-3 py-1.5">
+            <button
+              onClick={() => setDeepView("current")}
+              className={`rounded px-2 py-0.5 text-[10px] ${
+                deepView === "current"
+                  ? "bg-violet-100 text-violet-800"
+                  : "text-slate-500 hover:bg-slate-50"
+              }`}
+            >
+              Current run
+            </button>
+            <button
+              onClick={openHistory}
+              className={`rounded px-2 py-0.5 text-[10px] ${
+                deepView === "history"
+                  ? "bg-violet-100 text-violet-800"
+                  : "text-slate-500 hover:bg-slate-50"
+              }`}
+            >
+              History
+            </button>
+          </div>
+
+          {deepView === "current" ? (
+            <>
           <div className="border-b border-slate-200 p-3 space-y-2">
             <p className="text-[10px] text-slate-600">
               Research your full map and auto-place AI-suggested milestone boxes on
@@ -255,6 +300,116 @@ export default function MapIntelligencePanel({
               </div>
             )}
           </div>
+            </>
+          ) : (
+            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+              {history.loading && (
+                <p className="text-xs text-slate-500">Loading history…</p>
+              )}
+              {!history.loading && history.runs.length === 0 && (
+                <p className="text-xs text-slate-500">
+                  No saved runs yet. Run deep analysis to save your first report.
+                </p>
+              )}
+              {!history.selectedRun ? (
+                <ul className="space-y-2">
+                  {history.runs.map((run) => (
+                    <li key={run.id}>
+                      <button
+                        onClick={() => void history.loadRun(run.id)}
+                        className="w-full rounded border border-slate-200 bg-slate-50 p-2 text-left hover:bg-violet-50"
+                      >
+                        <p className="text-[10px] font-medium text-slate-700">
+                          {formatRunDate(run.createdAt)}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-600 line-clamp-2">
+                          {run.preview}
+                          {run.preview.length >= 200 ? "…" : ""}
+                        </p>
+                        <p className="mt-1 text-[10px] text-slate-400">
+                          {run.suggestionCount} suggestion
+                          {run.suggestionCount === 1 ? "" : "s"}
+                          {run.model ? ` · ${run.model}` : ""}
+                        </p>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={history.clearSelected}
+                      className="text-[10px] text-sky-600 hover:underline"
+                    >
+                      ← Back to list
+                    </button>
+                    {!readOnly && (
+                      <button
+                        onClick={async () => {
+                          if (
+                            !window.confirm("Delete this saved analysis run?")
+                          ) {
+                            return;
+                          }
+                          await history.deleteRun(history.selectedRun!.id);
+                        }}
+                        className="text-[10px] text-red-600 hover:underline"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-500">
+                    {formatRunDate(history.selectedRun.createdAt)}
+                    {history.selectedRun.model
+                      ? ` · ${history.selectedRun.model}`
+                      : ""}
+                  </p>
+                  {history.loadingDetail ? (
+                    <p className="text-xs text-slate-500">Loading…</p>
+                  ) : (
+                    <>
+                      <div className="rounded border border-violet-100 bg-violet-50 p-3 text-xs text-violet-900 whitespace-pre-wrap">
+                        {history.selectedRun.analysisText}
+                      </div>
+                      {history.selectedRun.suggestions.length > 0 && (
+                        <div className="space-y-2">
+                          <h3 className="text-xs font-semibold text-slate-800">
+                            Suggestions from this run (
+                            {history.selectedRun.suggestions.length})
+                          </h3>
+                          {history.selectedRun.suggestions.map((s, i) => (
+                            <div
+                              key={`${s.title}-${i}`}
+                              className="rounded border border-violet-200 bg-violet-50/50 p-2 text-xs"
+                            >
+                              <span className="font-medium text-slate-900">
+                                {s.title}
+                              </span>
+                              <span className="ml-1 text-slate-500">
+                                · {s.targetDate}
+                              </span>
+                              {s.description && (
+                                <p className="mt-1 text-slate-600">
+                                  {s.description}
+                                </p>
+                              )}
+                              {s.reasoning && (
+                                <p className="mt-1 text-[10px] text-violet-700">
+                                  {s.reasoning}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </>
       ) : (
         <>

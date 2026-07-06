@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { narratives, milestones, fragments, milestoneSuggestions } from "@/lib/schema";
-import { streamMapDeepAnalysis } from "@/lib/anthropic";
+import { narratives, milestones, fragments, milestoneSuggestions, notes, deepAnalysisRuns } from "@/lib/schema";
+import { streamMapDeepAnalysis, getClaudeModelId } from "@/lib/anthropic";
 import { parseMapDeepAnalysis } from "@/lib/mapAnalysis";
+import { saveDeepAnalysisRun } from "@/lib/deepAnalysisHistory";
 import { serializeMapContext } from "@/lib/mapSerialize";
 import {
   persistIfEditable,
@@ -11,16 +12,18 @@ import {
 export async function POST() {
   const ctx = await resolveMapContext();
 
-  const [allNarratives, allMilestones, allFragments] = await Promise.all([
+  const [allNarratives, allMilestones, allFragments, allNotes] = await Promise.all([
     ctx.db.select().from(narratives),
     ctx.db.select().from(milestones),
     ctx.db.select().from(fragments),
+    ctx.db.select().from(notes),
   ]);
 
   const mapContext = serializeMapContext(
     allNarratives,
     allMilestones,
-    allFragments
+    allFragments,
+    allNotes
   );
 
   const stream = new TransformStream();
@@ -44,7 +47,18 @@ export async function POST() {
         await writer.write(encoder.encode(chunk));
       }
 
-      const { suggestions } = parseMapDeepAnalysis(fullText);
+      const { analysis, suggestions } = parseMapDeepAnalysis(fullText);
+
+      if (ctx.editable && analysis.trim()) {
+        await saveDeepAnalysisRun(
+          ctx.db,
+          analysis,
+          suggestions,
+          getClaudeModelId()
+        );
+        persistIfEditable(ctx);
+      }
+
       if (suggestions.length > 0) {
         if (ctx.editable) {
           await ctx.db.delete(milestoneSuggestions);

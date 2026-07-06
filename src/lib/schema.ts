@@ -84,6 +84,15 @@ export const milestoneSuggestions = sqliteTable("milestone_suggestions", {
   createdAt: text("created_at").notNull(),
 });
 
+export const deepAnalysisRuns = sqliteTable("deep_analysis_runs", {
+  id: text("id").primaryKey(),
+  analysisText: text("analysis_text").notNull(),
+  suggestionsJson: text("suggestions_json").notNull().default("[]"),
+  model: text("model"),
+  suggestionCount: integer("suggestion_count").notNull().default(0),
+  createdAt: text("created_at").notNull(),
+});
+
 export const aiNewsSignals = sqliteTable("ai_news_signals", {
   id: text("id").primaryKey(),
   title: text("title").notNull(),
@@ -106,6 +115,7 @@ export type Narrative = typeof narratives.$inferSelect;
 export type Fragment = typeof fragments.$inferSelect;
 export type Milestone = typeof milestones.$inferSelect;
 export type MilestoneSuggestion = typeof milestoneSuggestions.$inferSelect;
+export type DeepAnalysisRun = typeof deepAnalysisRuns.$inferSelect;
 export type Note = typeof notes.$inferSelect;
 export type RssFeed = typeof rssFeeds.$inferSelect;
 export type AiNewsSignal = typeof aiNewsSignals.$inferSelect;
