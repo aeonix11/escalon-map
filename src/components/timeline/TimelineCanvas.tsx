@@ -14,7 +14,9 @@ import {
   TIMELINE_END_YEAR,
   TIMELINE_START_YEAR,
   getLaneOffset,
+  getNowTimelineFraction,
   getTimelineContentHeight,
+  isNowInTimelineRange,
 } from "@/lib/types";
 
 function maxLaneForHemisphere(
@@ -33,6 +35,7 @@ export default function TimelineCanvas() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const scrollAnchorRef = useRef<{ ratio: number; mouseX: number } | null>(null);
   const didCenterVerticallyRef = useRef(false);
+  const didCenterOnNowRef = useRef(false);
   const [viewportHeight, setViewportHeight] = useState(600);
   const [hoveredMilestoneId, setHoveredMilestoneId] = useState<string | null>(
     null
@@ -122,6 +125,32 @@ export default function TimelineCanvas() {
     el.scrollTop = (contentHeight - viewportHeight) / 2;
     didCenterVerticallyRef.current = true;
   }, [contentHeight, viewportHeight]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || didCenterOnNowRef.current || !isNowInTimelineRange()) return;
+
+    const centerOnNow = () => {
+      if (el.scrollWidth <= 0) return false;
+      const nowLeft = getNowTimelineFraction() * baseWidthPerYear;
+      const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
+      el.scrollLeft = Math.max(
+        0,
+        Math.min(maxScroll, nowLeft - el.clientWidth / 2)
+      );
+      return true;
+    };
+
+    if (centerOnNow()) {
+      didCenterOnNowRef.current = true;
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => {
+      if (centerOnNow()) didCenterOnNowRef.current = true;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [baseWidthPerYear, canvasWidth]);
 
   useEffect(() => {
     const el = scrollRef.current;

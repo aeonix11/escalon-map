@@ -31,11 +31,14 @@ yarn-error.log*
 .env*.local
 .env
 
-# database
+# database & local map data (never commit user timelines or API keys)
 *.db
 *.db-journal
-
-# local app data (maps, settings, API keys)
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+escalon.db
 /data/
 
 # bundled Node.js (installed by install.ps1)
