@@ -1,4 +1,4 @@
-<img width="2529" height="1177" alt="{7E1E376B-9B89-40F3-97AD-4C4B0E0306DA}" src="https://github.com/user-attachments/assets/5993a151-e8ca-4885-a2c1-cae1e5dcae9d" />
+
 
 
 # Escalon Map
