@@ -1,6 +1,6 @@
 # Escalon Map
 
-Personal dual-hemisphere prophetic/geopolitical timeline workspace for 32-inch desktop monitors (2026–2075).
+Personal dual-hemisphere prophetic/geopolitical timeline workspace. (2026–2075).
 
 ## Easiest way to start (Windows)
 
@@ -73,7 +73,7 @@ Enter keys in Settings. They are saved locally in `data/settings.json`.
 | Key | Used for |
 |---|---|
 | Anthropic | Map Intelligence chat & signal matching |
-| Voyage | Semantic search |
+| Voyage | Semantic search (optional — not fully working yet) |
 
 The app works without API keys — timeline editing and map switching still work.
 
