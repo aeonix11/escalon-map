@@ -1,6 +1,6 @@
 # Escalon Map
 
-Personal dual-hemisphere prophetic/geopolitical timeline workspace for 32-inch desktop monitors (2026–2075).
+Personal dual-hemisphere prophetic/geopolitical timeline workspace. (2026–2075).
 
 ## Easiest way to start (Windows)
 
