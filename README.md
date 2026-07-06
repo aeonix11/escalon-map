@@ -1,3 +1,7 @@
+<img width="2541" height="1152" alt="{BA91BC63-AA55-4F2A-A2EB-471CDD66EC64}" src="https://github.com/user-attachments/assets/7390d4d3-1c40-4543-b088-98b886e8d8df" />
+
+
+
 # Escalon Map
 
 A local-first timeline workspace for mapping **prophetic insight** and **real-world signals** on one canvas — from 2012 through 2075.
