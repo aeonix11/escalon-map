@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { initDb, persistDb } from "@/lib/db";
 import { aiNewsSignals, narratives } from "@/lib/schema";
 import { reasonMatch } from "@/lib/anthropic";
 import {
@@ -9,9 +8,17 @@ import {
   embedText,
   embeddingToBuffer,
 } from "@/lib/voyage";
+import {
+  persistIfEditable,
+  readOnlyResponse,
+  resolveMapContext,
+} from "@/lib/mapContext";
 
 export async function POST(req: NextRequest) {
-  const db = await initDb();
+  const ctx = await resolveMapContext();
+  if (!ctx.editable) return readOnlyResponse();
+
+  const db = ctx.db;
   const { signalId } = await req.json();
 
   const [signal] = await db
@@ -83,7 +90,7 @@ export async function POST(req: NextRequest) {
     })
     .where(eq(aiNewsSignals.id, signalId));
 
-  persistDb();
+  persistIfEditable(ctx);
 
   return NextResponse.json({
     matched: result.matched,

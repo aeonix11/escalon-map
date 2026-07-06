@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { initDb, persistDb } from "@/lib/db";
+import { seedIfEmpty } from "@/lib/seed";
 import {
   narratives,
   milestones,
@@ -7,28 +7,45 @@ import {
   fragmentNarratives,
   aiNewsSignals,
   rssFeeds,
+  notes,
+  milestoneSuggestions,
 } from "@/lib/schema";
-import { seedIfEmpty } from "@/lib/seed";
+import {
+  persistIfEditable,
+  resolveMapContext,
+} from "@/lib/mapContext";
 
 export async function GET() {
-  const db = await initDb();
-  await seedIfEmpty(db);
-  persistDb();
+  const ctx = await resolveMapContext();
+  if (ctx.editable) {
+    await seedIfEmpty(ctx.db);
+    persistIfEditable(ctx);
+  }
 
-  const [allNarratives, allMilestones, allFragments, allSignals, allFeeds] =
+  const [allNarratives, allMilestones, allFragments, allSignals, allFeeds, allNotes, allSuggestions] =
     await Promise.all([
-      db.select().from(narratives),
-      db.select().from(milestones),
-      db.select().from(fragments),
-      db.select().from(aiNewsSignals),
-      db.select().from(rssFeeds),
+      ctx.db.select().from(narratives),
+      ctx.db.select().from(milestones),
+      ctx.db.select().from(fragments),
+      ctx.db.select().from(aiNewsSignals),
+      ctx.db.select().from(rssFeeds),
+      ctx.db.select().from(notes),
+      ctx.db.select().from(milestoneSuggestions),
     ]);
 
   return NextResponse.json({
     narratives: allNarratives,
     milestones: allMilestones,
+    milestoneSuggestions: allSuggestions,
     fragments: allFragments,
     signals: allSignals,
     feeds: allFeeds,
+    notes: allNotes,
+    map: {
+      id: ctx.mapId,
+      name: ctx.entry.name,
+      editable: ctx.editable,
+      ownerLabel: ctx.entry.ownerLabel ?? null,
+    },
   });
 }

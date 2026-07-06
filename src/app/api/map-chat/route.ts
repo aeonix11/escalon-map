@@ -1,43 +1,20 @@
 import { NextRequest } from "next/server";
-import { initDb } from "@/lib/db";
-import {
-  narratives,
-  milestones,
-  fragments,
-  fragmentNarratives,
-} from "@/lib/schema";
+import { narratives, milestones, fragments } from "@/lib/schema";
 import { streamMapChat } from "@/lib/anthropic";
+import { serializeMapContext } from "@/lib/mapSerialize";
 import {
   bufferToEmbedding,
   cosineSimilarity,
   embedQuery,
 } from "@/lib/voyage";
+import { resolveMapContext } from "@/lib/mapContext";
 
 const TOKEN_THRESHOLD = 120000;
 const CHARS_PER_TOKEN = 4;
 
-function serializeMap(
-  allNarratives: typeof narratives.$inferSelect[],
-  allMilestones: typeof milestones.$inferSelect[],
-  allFragments: typeof fragments.$inferSelect[]
-): string {
-  let text = "=== NARRATIVES ===\n";
-  for (const n of allNarratives) {
-    text += `[${n.id}] ${n.title}: ${n.description ?? ""}\n`;
-  }
-  text += "\n=== MILESTONES ===\n";
-  for (const m of allMilestones) {
-    text += `[${m.id}] ${m.targetDate} | ${m.hemisphere} | ${m.title}: ${m.description ?? ""} (narrative: ${m.narrativeId ?? "none"})\n`;
-  }
-  text += "\n=== FRAGMENTS ===\n";
-  for (const f of allFragments) {
-    text += `[${f.id}] ${f.speaker} @ ${f.timestampSeconds}s: ${f.rawText}\n`;
-  }
-  return text;
-}
-
 export async function POST(req: NextRequest) {
-  const db = await initDb();
+  const ctx = await resolveMapContext();
+  const db = ctx.db;
   const { question } = await req.json();
 
   const [allNarratives, allMilestones, allFragments] = await Promise.all([
@@ -46,7 +23,7 @@ export async function POST(req: NextRequest) {
     db.select().from(fragments),
   ]);
 
-  const fullContext = serializeMap(
+  const fullContext = serializeMapContext(
     allNarratives,
     allMilestones,
     allFragments
@@ -104,7 +81,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const systemPrompt = `You are an expert analyst of prophetic timelines and geopolitical signals. The user has built a personal prophecy map spanning 2026-2075 with two hemispheres: UPPER_PROPHETIC (visionary/prophetic data above the axis) and LOWER_EARTHLY (real-world confirmed signals below the axis).
+  const systemPrompt = `You are an expert analyst of prophetic timelines and geopolitical signals. The user has built a personal prophecy map spanning 2012-2075 with two hemispheres: UPPER_PROPHETIC (visionary/prophetic data above the axis) and LOWER_EARTHLY (real-world confirmed signals below the axis).
 
 Here is the relevant map data:
 ${contextText}

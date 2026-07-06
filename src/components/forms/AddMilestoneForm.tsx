@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import type { Fragment, Narrative } from "@/lib/schema";
-import { formatTimestamp } from "@/lib/types";
+import {
+  formatTimestamp,
+  TIMELINE_START_YEAR,
+  TIMELINE_END_YEAR,
+} from "@/lib/types";
 import { inputClass } from "./formStyles";
 
 function fragmentLabel(f: Fragment): string {
@@ -30,12 +34,17 @@ export default function AddMilestoneForm({
   );
   const [isFuzzy, setIsFuzzy] = useState(false);
   const [fuzzyRangeMonths, setFuzzyRangeMonths] = useState(3);
+  const [isPersonal, setIsPersonal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    await fetch("/api/create", {
+    setError(null);
+    setSuccess(null);
+    const res = await fetch("/api/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -49,13 +58,20 @@ export default function AddMilestoneForm({
           hemisphere,
           isFuzzy,
           fuzzyRangeMonths,
+          isPersonal,
         },
       }),
     });
+    const data = await res.json().catch(() => ({}));
+    setLoading(false);
+    if (!res.ok) {
+      setError(data.error ?? "Failed to save milestone");
+      return;
+    }
+    setSuccess(`Saved: ${title} (${hemisphere === "LOWER_EARTHLY" ? "Earthly" : "Prophetic"})`);
     setTitle("");
     setDescription("");
     setLinkedFragmentId("");
-    setLoading(false);
     onCreated();
   };
 
@@ -82,6 +98,8 @@ export default function AddMilestoneForm({
         type="date"
         value={targetDate}
         onChange={(e) => setTargetDate(e.target.value)}
+        min={`${TIMELINE_START_YEAR}-01-01`}
+        max={`${TIMELINE_END_YEAR}-12-31`}
         className={`${inputClass} mb-2`}
       />
       <select
@@ -119,24 +137,50 @@ export default function AddMilestoneForm({
         onChange={(e) =>
           setHemisphere(e.target.value as "UPPER_PROPHETIC" | "LOWER_EARTHLY")
         }
-        className={`${inputClass} mb-2`}
+        className={`${inputClass} mb-1`}
       >
         <option value="UPPER_PROPHETIC">Upper — Prophetic</option>
         <option value="LOWER_EARTHLY">Lower — Earthly</option>
       </select>
+      <p className="mb-2 text-[10px] text-slate-500">
+        Earthly milestones appear in the blue zone below the timeline axis.
+      </p>
+      {error && (
+        <p className="mb-2 text-[10px] text-red-600">{error}</p>
+      )}
+      {success && (
+        <p className="mb-2 text-[10px] text-emerald-700">{success}</p>
+      )}
+      <label className="flex items-center gap-2 text-xs text-slate-600 mb-2">
+        <input
+          type="checkbox"
+          checked={isPersonal}
+          onChange={(e) => setIsPersonal(e.target.checked)}
+        />
+        Personal — omit from Export (for your eyes only)
+      </label>
       <label className="flex items-center gap-2 text-xs text-slate-600 mb-2">
         <input type="checkbox" checked={isFuzzy} onChange={(e) => setIsFuzzy(e.target.checked)} />
-        Fuzzy date window
+        Fuzzy window — extends forward from target date
       </label>
       {isFuzzy && (
-        <input
-          type="number"
-          min={1}
-          max={24}
-          value={fuzzyRangeMonths}
-          onChange={(e) => setFuzzyRangeMonths(Number(e.target.value))}
-          className={`${inputClass} mb-2`}
-        />
+        <>
+          <label className="mb-1 block text-[10px] text-slate-500">
+            Duration after start (months)
+          </label>
+          <input
+            type="number"
+            min={1}
+            max={120}
+            value={fuzzyRangeMonths}
+            onChange={(e) => setFuzzyRangeMonths(Number(e.target.value))}
+            className={`${inputClass} mb-1`}
+          />
+          <p className="mb-2 text-[10px] text-slate-400">
+            Card marks the start; timeline bar runs {fuzzyRangeMonths} month
+            {fuzzyRangeMonths === 1 ? "" : "s"} forward (up to 10 years).
+          </p>
+        </>
       )}
       <button
         type="submit"

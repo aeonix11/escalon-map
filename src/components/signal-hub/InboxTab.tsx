@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { AiNewsSignal, Narrative } from "@/lib/schema";
 import { useSignalMatcher } from "@/hooks/useSignalMatcher";
+import { useSignalScan } from "@/hooks/useSignalScan";
 import { inputClass } from "@/components/forms/formStyles";
 
 interface InboxTabProps {
@@ -10,6 +11,8 @@ interface InboxTabProps {
   narratives: Narrative[];
   onRefresh: () => void;
   expanded?: boolean;
+  readOnly?: boolean;
+  scan?: ReturnType<typeof useSignalScan>;
 }
 
 export default function InboxTab({
@@ -17,12 +20,14 @@ export default function InboxTab({
   narratives,
   onRefresh,
   expanded = false,
+  readOnly = false,
+  scan: externalScan,
 }: InboxTabProps) {
   const { matchSignal, loading: matching } = useSignalMatcher();
+  const internalScan = useSignalScan(onRefresh);
+  const { scanning, scanOutput, runDeepAnalysis } = externalScan ?? internalScan;
   const [newTitle, setNewTitle] = useState("");
   const [newSummary, setNewSummary] = useState("");
-  const [scanning, setScanning] = useState(false);
-  const [scanOutput, setScanOutput] = useState("");
   const [matchResults, setMatchResults] = useState<
     Record<string, { reasoning: string; narrativeId: string | null }>
   >({});
@@ -89,34 +94,6 @@ export default function InboxTab({
     onRefresh();
   };
 
-  const handleScanAll = async () => {
-    setScanning(true);
-    setScanOutput("");
-    try {
-      const res = await fetch("/api/signals/scan", { method: "POST" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Scan failed" }));
-        setScanOutput(err.error ?? "Scan failed");
-        return;
-      }
-      const reader = res.body?.getReader();
-      if (!reader) return;
-      const decoder = new TextDecoder();
-      let text = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        text += decoder.decode(value, { stream: true });
-        setScanOutput(text);
-      }
-      onRefresh();
-    } catch (e) {
-      setScanOutput(e instanceof Error ? e.message : "Scan failed");
-    } finally {
-      setScanning(false);
-    }
-  };
-
   const getNarrativeTitle = (narrativeId: string | null) => {
     if (!narrativeId) return null;
     return narratives.find((n) => n.id === narrativeId)?.title ?? null;
@@ -126,20 +103,22 @@ export default function InboxTab({
     ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"
     : "space-y-3";
 
-  const controlsClass = expanded
-    ? "grid grid-cols-1 md:grid-cols-2 gap-3 border-b border-slate-200 p-3"
-    : "border-b border-slate-200 p-3 space-y-2";
-
   return (
     <div className="flex h-full flex-col">
-      <div className={controlsClass}>
-        <div className="space-y-2">
+      {readOnly && (
+        <p className="border-b border-amber-100 bg-amber-50 px-3 py-2 text-[10px] text-amber-900">
+          View-only map — signal actions are disabled.
+        </p>
+      )}
+
+      {!readOnly && (
+        <div className="border-b border-slate-200 p-3 space-y-2">
           <button
-            onClick={handleScanAll}
+            onClick={runDeepAnalysis}
             disabled={scanning || inbox.length === 0}
-            className="w-full rounded bg-violet-600 px-2 py-1.5 text-xs text-white hover:bg-violet-500 disabled:opacity-50"
+            className="w-full rounded bg-violet-600 px-2 py-1.5 text-xs font-medium text-white hover:bg-violet-500 disabled:opacity-50"
           >
-            {scanning ? "Scanning map relevance..." : "Scan All — AI relevance check"}
+            {scanning ? "Scanning inbox…" : "Scan inbox signals"}
           </button>
           {scanOutput && (
             <pre
@@ -151,8 +130,10 @@ export default function InboxTab({
             </pre>
           )}
         </div>
+      )}
 
-        <div className="space-y-2">
+      {!readOnly && (
+        <div className="border-b border-slate-200 p-3 space-y-2">
           <input
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
@@ -172,7 +153,7 @@ export default function InboxTab({
             Add Signal
           </button>
         </div>
-      </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-3">
         {inbox.length === 0 && (
@@ -227,6 +208,7 @@ export default function InboxTab({
                   Narrative: {narrativeTitle}
                 </p>
               )}
+              {!readOnly && (
               <div className="mt-2 flex flex-wrap gap-1">
                 <button
                   onClick={() => handleMatch(signal.id)}
@@ -254,6 +236,7 @@ export default function InboxTab({
                   Delete
                 </button>
               </div>
+              )}
             </div>
           );
         })}

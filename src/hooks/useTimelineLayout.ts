@@ -1,51 +1,79 @@
 import { useMemo } from "react";
-import type { Milestone, Narrative } from "@/lib/schema";
+import type { Milestone, Narrative, MilestoneSuggestion } from "@/lib/schema";
 import {
   CARD_WIDTH,
   LANE_GAP,
   getZoomLevel,
-  TIMELINE_START_YEAR,
+  parseTargetDateFraction,
   type VisualMilestone,
   type ZoomLevel,
 } from "@/lib/types";
 
+function suggestionToLayoutItem(s: MilestoneSuggestion): Milestone & {
+  isAiSuggested: true;
+  suggestionId: string;
+  suggestionReasoning: string | null;
+  linkedFragmentId: null;
+  isPersonal: false;
+} {
+  return {
+    id: s.id,
+    narrativeId: s.narrativeId,
+    title: s.title,
+    description: s.description,
+    targetDate: s.targetDate,
+    isFuzzy: s.isFuzzy,
+    fuzzyRangeMonths: s.fuzzyRangeMonths,
+    isPersonal: false,
+    hemisphere: s.hemisphere,
+    linkedFragmentId: null,
+    createdAt: s.createdAt,
+    isAiSuggested: true,
+    suggestionId: s.id,
+    suggestionReasoning: s.reasoning,
+  };
+}
+
 export function useTimelineLayout(
   milestones: Milestone[],
+  suggestions: MilestoneSuggestion[],
   narratives: Narrative[],
   zoomScale: number,
   activeNarrativeId: string | null
-): { milestones: VisualMilestone[]; zoomLevel: ZoomLevel } {
+): {
+  milestones: VisualMilestone[];
+  zoomLevel: ZoomLevel;
+  maxUpperLane: number;
+  maxLowerLane: number;
+} {
   const zoomLevel = useMemo(() => getZoomLevel(zoomScale), [zoomScale]);
+  const safeNarratives = Array.isArray(narratives) ? narratives : [];
 
   const computed = useMemo(() => {
     const baseWidthPerYear = zoomScale * 12;
     const narrativeColorMap = new Map(
-      narratives.map((n) => [n.id, n.colorHex])
+      safeNarratives.map((n) => [n.id, n.colorHex])
     );
 
     const upperLaneOccupancy: Record<number, number[]> = {};
     const lowerLaneOccupancy: Record<number, number[]> = {};
 
-    const sorted = [...milestones].sort((a, b) =>
+    const layoutItems = [
+      ...milestones.map((m) => ({ ...m, isAiSuggested: false as const })),
+      ...suggestions.map(suggestionToLayoutItem),
+    ];
+
+    const sorted = [...layoutItems].sort((a, b) =>
       a.targetDate.localeCompare(b.targetDate)
     );
 
     return sorted.map((m) => {
-      const dateObj = new Date(m.targetDate);
-      const yearFraction =
-        dateObj.getFullYear() -
-        TIMELINE_START_YEAR +
-        dateObj.getMonth() / 12;
-
+      const yearFraction = parseTargetDateFraction(m.targetDate);
       const leftPixel = yearFraction * baseWidthPerYear;
 
       let opacity = 1.0;
       if (activeNarrativeId && m.narrativeId !== activeNarrativeId) {
-        opacity = 0.2;
-      } else if (zoomLevel === "DECADAL" && !activeNarrativeId) {
-        opacity = 0.5;
-      } else if (zoomLevel === "YEARLY" && !activeNarrativeId) {
-        opacity = 0.75;
+        opacity = m.isAiSuggested ? 0.55 : 0.2;
       }
 
       const occupancyMap =
@@ -71,8 +99,8 @@ export function useTimelineLayout(
       let fuzzyWidth: number | undefined;
       if (m.isFuzzy) {
         const rangeYears = m.fuzzyRangeMonths / 12;
-        fuzzyLeftPixel = leftPixel - rangeYears * baseWidthPerYear;
-        fuzzyWidth = rangeYears * 2 * baseWidthPerYear;
+        fuzzyLeftPixel = leftPixel;
+        fuzzyWidth = rangeYears * baseWidthPerYear;
       }
 
       return {
@@ -85,9 +113,22 @@ export function useTimelineLayout(
           : undefined,
         fuzzyLeftPixel,
         fuzzyWidth,
+        suggestionId: m.isAiSuggested ? m.suggestionId : undefined,
+        suggestionReasoning: m.isAiSuggested ? m.suggestionReasoning : undefined,
       };
     });
-  }, [milestones, narratives, zoomScale, activeNarrativeId, zoomLevel]);
+  }, [milestones, suggestions, safeNarratives, zoomScale, activeNarrativeId, zoomLevel]);
 
-  return { milestones: computed, zoomLevel };
+  const maxUpperLane = computed.reduce(
+    (max, m) =>
+      m.hemisphere === "UPPER_PROPHETIC" ? Math.max(max, m.lane) : max,
+    0
+  );
+  const maxLowerLane = computed.reduce(
+    (max, m) =>
+      m.hemisphere === "LOWER_EARTHLY" ? Math.max(max, m.lane) : max,
+    0
+  );
+
+  return { milestones: computed, zoomLevel, maxUpperLane, maxLowerLane };
 }

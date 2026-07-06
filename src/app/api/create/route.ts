@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initDb, persistDb } from "@/lib/db";
-import { narratives, milestones, fragments, fragmentNarratives } from "@/lib/schema";
+import { narratives, milestones, fragments, fragmentNarratives, notes } from "@/lib/schema";
+import { eq } from "drizzle-orm";
 import { nowIso } from "@/lib/types";
 import { embedText, embeddingToBuffer } from "@/lib/voyage";
+import {
+  persistIfEditable,
+  readOnlyResponse,
+  resolveMapContext,
+} from "@/lib/mapContext";
 
 export async function POST(req: NextRequest) {
-  const db = await initDb();
+  const ctx = await resolveMapContext();
+  if (!ctx.editable) return readOnlyResponse();
+
+  const db = ctx.db;
   const body = await req.json();
   const { type, data } = body;
 
@@ -22,7 +30,7 @@ export async function POST(req: NextRequest) {
       embedding: embedding ? embeddingToBuffer(embedding) : null,
       createdAt: nowIso(),
     });
-    persistDb();
+    persistIfEditable(ctx);
     return NextResponse.json({ id });
   }
 
@@ -46,25 +54,73 @@ export async function POST(req: NextRequest) {
         });
       }
     }
-    persistDb();
+    persistIfEditable(ctx);
     return NextResponse.json({ id });
   }
 
   if (type === "milestone") {
+    const hemisphere = data.hemisphere;
+    if (
+      hemisphere !== "UPPER_PROPHETIC" &&
+      hemisphere !== "LOWER_EARTHLY"
+    ) {
+      return NextResponse.json(
+        { error: "hemisphere must be UPPER_PROPHETIC or LOWER_EARTHLY" },
+        { status: 400 }
+      );
+    }
+
+    try {
+      const id = crypto.randomUUID();
+      await db.insert(milestones).values({
+        id,
+        narrativeId: data.narrativeId ?? null,
+        title: data.title,
+        description: data.description ?? null,
+        targetDate: data.targetDate,
+        isFuzzy: data.isFuzzy ?? false,
+        fuzzyRangeMonths: data.fuzzyRangeMonths ?? 3,
+        isPersonal: data.isPersonal ?? false,
+        hemisphere,
+        linkedFragmentId: data.linkedFragmentId ?? null,
+        createdAt: nowIso(),
+      });
+      persistIfEditable(ctx);
+
+      const [created] = await db
+        .select()
+        .from(milestones)
+        .where(eq(milestones.id, id))
+        .limit(1);
+
+      if (!created) {
+        return NextResponse.json(
+          { error: "Milestone insert failed to persist" },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ id, milestone: created });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Insert failed";
+      return NextResponse.json({ error: msg }, { status: 500 });
+    }
+  }
+
+  if (type === "note") {
     const id = crypto.randomUUID();
-    await db.insert(milestones).values({
+    const ts = nowIso();
+    await db.insert(notes).values({
       id,
-      narrativeId: data.narrativeId ?? null,
       title: data.title,
-      description: data.description ?? null,
-      targetDate: data.targetDate,
-      isFuzzy: data.isFuzzy ?? false,
-      fuzzyRangeMonths: data.fuzzyRangeMonths ?? 3,
-      hemisphere: data.hemisphere,
-      linkedFragmentId: data.linkedFragmentId ?? null,
-      createdAt: nowIso(),
+      content: data.content ?? "",
+      isPersonal: data.isPersonal ?? false,
+      pinnedDate: data.pinnedDate ?? null,
+      hemisphere: data.hemisphere ?? null,
+      createdAt: ts,
+      updatedAt: ts,
     });
-    persistDb();
+    persistIfEditable(ctx);
     return NextResponse.json({ id });
   }
 

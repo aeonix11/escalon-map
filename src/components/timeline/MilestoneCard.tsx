@@ -17,55 +17,56 @@ export default function MilestoneCard({
 }: MilestoneCardProps) {
   const color =
     data.narrativeColor ?? (variant === "prophetic" ? "#f59e0b" : "#0ea5e9");
-  const isCompact = zoomLevel === "DECADAL";
-  const isYearly = zoomLevel === "YEARLY";
-
-  if (isCompact) {
-    return (
-      <button
-        onClick={onClick}
-        className="group relative flex h-6 w-6 items-center justify-center rounded-full border-2 border-white shadow-sm transition-transform hover:scale-125"
-        style={{ backgroundColor: color }}
-        title={data.title}
-      >
-        {data.isFuzzy && (
-          <span
-            className="absolute -bottom-1 left-1/2 h-1 w-3 -translate-x-1/2 rounded-full opacity-80"
-            style={{ backgroundColor: color }}
-          />
-        )}
-        <span className="absolute -top-8 left-0 hidden whitespace-nowrap rounded bg-white border border-slate-200 px-2 py-1 text-xs text-slate-800 shadow-md group-hover:block">
-          {data.title}
-        </span>
-      </button>
-    );
-  }
+  const isDecadal = zoomLevel === "DECADAL";
+  const showDescription = zoomLevel === "SEASONAL" && data.description;
+  const isSuggested = Boolean(data.isAiSuggested);
 
   return (
     <button
       onClick={onClick}
-      className="group relative rounded-lg border bg-white p-3 text-left shadow-sm transition-all hover:scale-[1.02] hover:shadow-md"
+      className={`group relative w-full rounded-lg border bg-white text-left shadow-sm transition-all hover:scale-[1.02] hover:shadow-md ${
+        isDecadal ? "p-2" : "p-3"
+      } ${isSuggested ? "border-dashed border-violet-400 bg-violet-50/60" : ""}`}
       style={{
-        borderColor: color + "55",
+        borderColor: isSuggested ? undefined : color + "55",
       }}
     >
-      <div
-        className="absolute left-0 top-0 h-1 w-full rounded-t-lg"
-        style={{ backgroundColor: color }}
-      />
-      <p className="text-[10px] text-slate-500">{data.targetDate}</p>
-      <h4 className="text-sm font-medium text-slate-900">{data.title}</h4>
-      {!isYearly && data.description && (
+      {!isSuggested && (
+        <div
+          className="absolute left-0 top-0 h-1 w-full rounded-t-lg"
+          style={{ backgroundColor: color }}
+        />
+      )}
+      <p className={`text-slate-500 ${isDecadal ? "text-[9px]" : "text-[10px]"}`}>
+        {data.targetDate}
+        {data.isFuzzy && (
+          <span className="ml-1 text-slate-400">· +{data.fuzzyRangeMonths}mo</span>
+        )}
+        {data.isPersonal && (
+          <span className="ml-1 rounded bg-violet-100 px-1 text-violet-700">Personal</span>
+        )}
+        {isSuggested && (
+          <span className="ml-1 rounded bg-violet-200 px-1 text-violet-800">AI suggested</span>
+        )}
+      </p>
+      <h4
+        className={`font-medium text-slate-900 ${
+          isDecadal ? "text-xs leading-snug" : "text-sm"
+        }`}
+      >
+        {data.title}
+      </h4>
+      {showDescription && (
         <p className="mt-1 text-xs text-slate-600 line-clamp-2">
           {data.description}
         </p>
       )}
-      <div
-        className="absolute -top-10 left-0 hidden whitespace-nowrap rounded bg-white border border-slate-200 px-2 py-1 text-xs text-slate-800 shadow-lg group-hover:block"
-      >
-        {data.title}
-        {data.description && ` — ${data.description}`}
-      </div>
+      {!showDescription && data.description && (
+        <div className="absolute -top-10 left-0 hidden whitespace-nowrap rounded border border-slate-200 bg-white px-2 py-1 text-xs text-slate-800 shadow-lg group-hover:block">
+          {data.title}
+          {` — ${data.description}`}
+        </div>
+      )}
     </button>
   );
 }

@@ -1,6 +1,6 @@
 /**
  * Standalone RSS poller for Escalon Map.
- * Run via poll.cmd or Windows Task Scheduler.
+ * Run via poll.cmd (manual), poll-silent.vbs (Task Scheduler), or setup-scheduler.cmd.
  */
 import initSqlJs from "sql.js";
 import fs from "fs";

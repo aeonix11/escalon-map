@@ -13,6 +13,7 @@ interface SignalHubProps {
   feeds: RssFeed[];
   narratives: Narrative[];
   onRefresh: () => void;
+  readOnly?: boolean;
 }
 
 export default function SignalHub({
@@ -20,6 +21,7 @@ export default function SignalHub({
   feeds,
   narratives,
   onRefresh,
+  readOnly = false,
 }: SignalHubProps) {
   const [expanded, setExpanded] = useState(false);
   const [tab, setTab] = useState<HubTab>("inbox");
@@ -80,10 +82,16 @@ export default function SignalHub({
             narratives={narratives}
             onRefresh={onRefresh}
             expanded={expanded}
+            readOnly={readOnly}
           />
         )}
         {tab === "feeds" && (
-          <FeedsTab feeds={feeds} onRefresh={onRefresh} expanded={expanded} />
+          <FeedsTab
+            feeds={feeds}
+            onRefresh={onRefresh}
+            expanded={expanded}
+            readOnly={readOnly}
+          />
         )}
         {tab === "history" && (
           <HistoryTab

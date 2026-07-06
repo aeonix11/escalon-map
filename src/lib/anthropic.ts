@@ -87,6 +87,75 @@ Respond in JSON only:
   };
 }
 
+export async function streamMapDeepAnalysis(
+  mapContext: string,
+  narratives: NarrativeCandidate[]
+): Promise<AsyncIterable<string>> {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return (async function* () {
+      yield "ANTHROPIC_API_KEY not configured. Add your key in Settings to run deep analysis.";
+    })();
+  }
+
+  const narrativeList = narratives
+    .map(
+      (n) =>
+        `- ID: ${n.id}\n  Title: ${n.title}\n  Description: ${n.description ?? "N/A"}`
+    )
+    .join("\n");
+
+  const anthropic = getClient();
+  const stream = await anthropic.messages.stream({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 8192,
+    messages: [
+      {
+        role: "user",
+        content: `You are an expert analyst of prophetic timelines and geopolitical signals. The user has a prophecy map spanning 2012-2075 with two hemispheres: UPPER_PROPHETIC (visionary/prophetic above the axis) and LOWER_EARTHLY (real-world confirmed signals below).
+
+CURRENT MAP DATA:
+${mapContext}
+
+AVAILABLE NARRATIVES (use these IDs when linking suggestions):
+${narrativeList || "None — use narrativeId null"}
+
+Perform a DEEP ANALYSIS of this map:
+1. Identify patterns, convergences, gaps, and tensions across narratives and dates
+2. Note what's missing or underrepresented on the timeline
+3. Suggest where earthly signals might confirm or challenge prophetic milestones
+4. Be specific with dates and narrative names
+
+Write your analysis in clear prose (several paragraphs). Do NOT use markdown headers.
+
+After your analysis, on its own line, write exactly: ---SUGGESTIONS---
+
+Then output a JSON array (no markdown fence) of 5-12 NEW milestone suggestions to enrich the timeline. Do not duplicate existing milestones. Each item:
+{
+  "title": "short title",
+  "description": "1-2 sentences",
+  "targetDate": "YYYY-MM-DD",
+  "hemisphere": "UPPER_PROPHETIC" or "LOWER_EARTHLY",
+  "narrativeId": "narrative id from list or null",
+  "isFuzzy": false,
+  "fuzzyRangeMonths": 3,
+  "reasoning": "why this belongs on the map"
+}`,
+      },
+    ],
+  });
+
+  return (async function* () {
+    for await (const event of stream) {
+      if (
+        event.type === "content_block_delta" &&
+        event.delta.type === "text_delta"
+      ) {
+        yield event.delta.text;
+      }
+    }
+  })();
+}
+
 export async function streamMapChat(
   systemPrompt: string,
   userMessage: string

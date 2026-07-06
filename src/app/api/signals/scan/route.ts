@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { initDb, persistDb } from "@/lib/db";
 import {
   narratives,
   milestones,
@@ -10,9 +9,17 @@ import {
   streamSignalScan,
   parseScanResults,
 } from "@/lib/anthropic";
+import {
+  persistIfEditable,
+  readOnlyResponse,
+  resolveMapContext,
+} from "@/lib/mapContext";
 
 export async function POST() {
-  const db = await initDb();
+  const ctx = await resolveMapContext();
+  if (!ctx.editable) return readOnlyResponse();
+
+  const db = ctx.db;
 
   const allNarratives = await db.select().from(narratives);
   const allMilestones = await db.select().from(milestones);
@@ -79,7 +86,7 @@ export async function POST() {
         updated += 1;
       }
 
-      persistDb();
+      persistIfEditable(ctx);
       await writer.write(
         encoder.encode(`\n\n---\nScan complete. ${updated} signal(s) marked as relevant.`)
       );

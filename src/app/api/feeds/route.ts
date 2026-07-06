@@ -1,19 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { initDb, persistDb } from "@/lib/db";
 import { rssFeeds } from "@/lib/schema";
 import { nowIso } from "@/lib/types";
 import { pollFeed } from "@/lib/feedService";
+import {
+  persistIfEditable,
+  readOnlyResponse,
+  resolveMapContext,
+} from "@/lib/mapContext";
 
 export async function GET() {
-  const db = await initDb();
-  const feeds = await db.select().from(rssFeeds);
+  const ctx = await resolveMapContext();
+  const feeds = await ctx.db.select().from(rssFeeds);
   return NextResponse.json(feeds);
 }
 
 export async function POST(req: NextRequest) {
-  const db = await initDb();
-  const body = await req.json();
+  const ctx = await resolveMapContext();
+  if (!ctx.editable) return readOnlyResponse();
+
+  const db = ctx.db;
+  let body: {
+    action?: string;
+    url?: string;
+    label?: string;
+    pollIntervalMinutes?: number;
+    feedId?: string;
+    force?: boolean;
+  } = {};
+  try {
+    const text = await req.text();
+    if (text.trim()) {
+      body = JSON.parse(text);
+    }
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
   const { action } = body;
 
   if (action === "add") {
@@ -34,7 +57,7 @@ export async function POST(req: NextRequest) {
       lastFetched: null,
       createdAt: nowIso(),
     });
-    persistDb();
+    persistIfEditable(ctx);
     return NextResponse.json({ id });
   }
 
@@ -44,7 +67,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "feedId required" }, { status: 400 });
     }
     await db.delete(rssFeeds).where(eq(rssFeeds.id, feedId));
-    persistDb();
+    persistIfEditable(ctx);
     return NextResponse.json({ ok: true });
   }
 
@@ -65,7 +88,7 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await pollFeed(db, feed, force ?? true);
-    persistDb();
+    persistIfEditable(ctx);
     return NextResponse.json(result);
   }
 
@@ -91,7 +114,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    persistDb();
+    persistIfEditable(ctx);
     const totalAdded = results.reduce((sum, r) => sum + r.added, 0);
     return NextResponse.json({ totalAdded, results });
   }

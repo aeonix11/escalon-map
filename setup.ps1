@@ -4,6 +4,11 @@
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
+$nodeDir = Join-Path $PSScriptRoot "tools\node"
+if (Test-Path (Join-Path $nodeDir "node.exe")) {
+  $env:PATH = "$nodeDir;$env:PATH"
+}
+
 Write-Host "Installing dependencies..."
 & npm.cmd install
 if ($LASTEXITCODE -ne 0) {

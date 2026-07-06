@@ -1,52 +1,113 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 import { useMapStore } from "@/store/mapStore";
 import { useTimelineLayout } from "@/hooks/useTimelineLayout";
+import { useNotesLayout } from "@/hooks/useNotesLayout";
 import CentralTimeAxis from "./CentralTimeAxis";
 import MilestoneCard from "./MilestoneCard";
-import SVGBezierConnector from "./SVGBezierConnector";
+import NoteCard from "./NoteCard";
 import MilestoneAnchorLines from "./MilestoneAnchorLines";
+import NoteAnchorLines from "./NoteAnchorLines";
+import NowMarker from "./NowMarker";
 import {
   TIMELINE_END_YEAR,
   TIMELINE_START_YEAR,
   getLaneOffset,
+  getTimelineContentHeight,
 } from "@/lib/types";
+
+function maxLaneForHemisphere(
+  items: { lane: number; hemisphere?: string | null }[],
+  hemisphere: "UPPER_PROPHETIC" | "LOWER_EARTHLY"
+): number {
+  return items.reduce(
+    (max, item) =>
+      item.hemisphere === hemisphere ? Math.max(max, item.lane) : max,
+    0
+  );
+}
 
 export default function TimelineCanvas() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const scrollAnchorRef = useRef<{ ratio: number; mouseX: number } | null>(null);
-  const [canvasHeight, setCanvasHeight] = useState(600);
+  const didCenterVerticallyRef = useRef(false);
+  const [viewportHeight, setViewportHeight] = useState(600);
   const [hoveredMilestoneId, setHoveredMilestoneId] = useState<string | null>(
     null
   );
+  const [hoveredNoteId, setHoveredNoteId] = useState<string | null>(null);
 
   const {
     milestones,
+    milestoneSuggestions,
+    notes,
     narratives,
     zoomScale,
     activeNarrativeId,
+    hidePersonalMilestones,
     setSelectedMilestoneId,
+    setSelectedSuggestionId,
+    setSelectedNoteId,
     setDrawerMode,
     setZoomScale,
   } = useMapStore();
 
-  const { milestones: computed, zoomLevel } = useTimelineLayout(
-    milestones,
+  const layoutMilestones = useMemo(
+    () =>
+      hidePersonalMilestones
+        ? milestones.filter((m) => !m.isPersonal)
+        : milestones,
+    [milestones, hidePersonalMilestones]
+  );
+
+  const layoutNotes = useMemo(
+    () =>
+      hidePersonalMilestones ? notes.filter((n) => !n.isPersonal) : notes,
+    [notes, hidePersonalMilestones]
+  );
+
+  const {
+    milestones: computed,
+    zoomLevel,
+    maxUpperLane: maxMilestoneUpperLane,
+    maxLowerLane: maxMilestoneLowerLane,
+  } = useTimelineLayout(
+    layoutMilestones,
+    milestoneSuggestions,
     narratives,
     zoomScale,
     activeNarrativeId
   );
 
+  const { notes: computedNotes } = useNotesLayout(layoutNotes, zoomScale);
+
+  const maxUpperLane = Math.max(
+    maxMilestoneUpperLane,
+    maxLaneForHemisphere(computedNotes, "UPPER_PROPHETIC")
+  );
+  const maxLowerLane = Math.max(
+    maxMilestoneLowerLane,
+    maxLaneForHemisphere(computedNotes, "LOWER_EARTHLY")
+  );
+
+  const contentHeight = getTimelineContentHeight(
+    viewportHeight,
+    maxUpperLane,
+    maxLowerLane,
+    zoomLevel
+  );
+
   const baseWidthPerYear = zoomScale * 12;
   const totalYears = TIMELINE_END_YEAR - TIMELINE_START_YEAR;
   const canvasWidth = totalYears * baseWidthPerYear + 400;
+  const centerY = contentHeight / 2;
 
   useEffect(() => {
-    const el = canvasRef.current;
+    const el = scrollRef.current;
     if (!el) return;
-    const update = () => setCanvasHeight(el.clientHeight);
+    const update = () => setViewportHeight(el.clientHeight);
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
@@ -55,10 +116,21 @@ export default function TimelineCanvas() {
 
   useEffect(() => {
     const el = scrollRef.current;
+    if (!el || didCenterVerticallyRef.current || contentHeight <= viewportHeight) {
+      return;
+    }
+    el.scrollTop = (contentHeight - viewportHeight) / 2;
+    didCenterVerticallyRef.current = true;
+  }, [contentHeight, viewportHeight]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
     if (!el) return;
 
     const onWheel = (e: WheelEvent) => {
-      if (e.deltaY === 0) return;
+      const zoomIntent = e.ctrlKey || e.metaKey;
+      if (!zoomIntent || e.deltaY === 0) return;
+
       e.preventDefault();
 
       const rect = el.getBoundingClientRect();
@@ -89,49 +161,102 @@ export default function TimelineCanvas() {
     el.scrollLeft = anchor.ratio * el.scrollWidth - anchor.mouseX;
   }, [zoomScale, canvasWidth]);
 
-  const handleMilestoneClick = (id: string) => {
-    setSelectedMilestoneId(id);
+  const handleMilestoneClick = (id: string, isSuggested: boolean) => {
+    if (isSuggested) {
+      setSelectedSuggestionId(id);
+    } else {
+      setSelectedMilestoneId(id);
+    }
     setDrawerMode("detail");
+  };
+
+  const handleNoteClick = (id: string) => {
+    setSelectedNoteId(id);
+    setDrawerMode("notes");
   };
 
   return (
     <div
       ref={scrollRef}
-      className="relative h-[85vh] w-full overflow-x-auto overflow-y-hidden select-none bg-slate-100/80"
+      className="relative h-full w-full overflow-x-auto overflow-y-auto select-none bg-slate-100/80"
     >
       <div
         ref={canvasRef}
-        style={{ width: `${canvasWidth}px` }}
-        className="relative h-full"
+        style={{ width: `${canvasWidth}px`, minHeight: `${contentHeight}px` }}
+        className="relative"
       >
-        {/* Hemisphere zones — use vertical screen space */}
-        <div
-          className="absolute inset-x-0 top-0 bottom-1/2 bg-amber-50/40 pointer-events-none"
-        />
-        <div
-          className="absolute inset-x-0 top-1/2 bottom-0 bg-sky-50/40 pointer-events-none"
-        />
+        {/* Hemisphere zones */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 bottom-1/2 bg-amber-50/40" />
+        <div className="pointer-events-none absolute inset-x-0 top-1/2 bottom-0 bg-sky-50/40" />
+        <div className="pointer-events-none absolute left-3 top-3 rounded bg-amber-100/90 px-2 py-0.5 text-[10px] font-medium text-amber-800 border border-amber-200">
+          Prophetic
+        </div>
+        <div className="pointer-events-none absolute left-3 bottom-3 rounded bg-sky-100/90 px-2 py-0.5 text-[10px] font-medium text-sky-800 border border-sky-200">
+          Earthly
+        </div>
+
+        {Array.from(
+          { length: TIMELINE_END_YEAR - TIMELINE_START_YEAR + 1 },
+          (_, i) => TIMELINE_START_YEAR + i
+        ).map((year) => (
+          <div
+            key={year}
+            className="pointer-events-none absolute inset-y-0 w-px bg-slate-300/35"
+            style={{
+              left: `${(year - TIMELINE_START_YEAR) * baseWidthPerYear}px`,
+            }}
+          />
+        ))}
+
+        <NowMarker baseWidthPerYear={baseWidthPerYear} />
 
         <MilestoneAnchorLines
           milestones={computed}
           canvasWidth={canvasWidth}
-          canvasHeight={canvasHeight}
+          canvasHeight={contentHeight}
           zoomLevel={zoomLevel}
           highlightedMilestoneId={hoveredMilestoneId}
         />
 
-        {activeNarrativeId && (
-          <SVGBezierConnector
-            milestones={computed}
-            narrativeColor={
-              narratives.find((n) => n.id === activeNarrativeId)?.colorHex ??
-              "#3b82f6"
-            }
-            canvasWidth={canvasWidth}
-            canvasHeight={canvasHeight}
-            zoomLevel={zoomLevel}
-          />
-        )}
+        <NoteAnchorLines
+          notes={computedNotes}
+          canvasWidth={canvasWidth}
+          canvasHeight={contentHeight}
+          zoomLevel={zoomLevel}
+          highlightedNoteId={hoveredNoteId}
+        />
+
+        {computedNotes.map((n) => {
+          if (!n.hemisphere) return null;
+          const offset = getLaneOffset(n.lane, zoomLevel);
+          const isUpper = n.hemisphere === "UPPER_PROPHETIC";
+          const isHovered = hoveredNoteId === n.id;
+          const isDimmed = hoveredNoteId !== null && hoveredNoteId !== n.id;
+
+          return (
+            <div
+              key={n.id}
+              onMouseEnter={() => setHoveredNoteId(n.id)}
+              onMouseLeave={() => setHoveredNoteId(null)}
+              style={{
+                left: `${n.leftPixel}px`,
+                opacity: isDimmed ? 0.45 : 1,
+                ...(isUpper
+                  ? { bottom: contentHeight - centerY + offset }
+                  : { top: centerY + offset }),
+              }}
+              className={`absolute w-52 pointer-events-auto transition-all duration-200 ease-out ${
+                isHovered ? "z-[14] scale-[1.02]" : "z-[12]"
+              }`}
+            >
+              <NoteCard
+                data={n}
+                zoomLevel={zoomLevel}
+                onClick={() => handleNoteClick(n.id)}
+              />
+            </div>
+          );
+        })}
 
         {computed.map((m) => {
           const offset = getLaneOffset(m.lane, zoomLevel);
@@ -149,8 +274,8 @@ export default function TimelineCanvas() {
                 left: `${m.leftPixel}px`,
                 opacity: isDimmed ? m.opacity * 0.45 : m.opacity,
                 ...(isUpper
-                  ? { bottom: `calc(50% + ${offset}px)` }
-                  : { top: `calc(50% + ${offset}px)` }),
+                  ? { bottom: contentHeight - centerY + offset }
+                  : { top: centerY + offset }),
               }}
               className={`absolute w-[260px] pointer-events-auto transition-all duration-200 ease-out ${
                 isHovered ? "z-[14] scale-[1.02]" : "z-[12]"
@@ -160,7 +285,7 @@ export default function TimelineCanvas() {
                 data={m}
                 variant={isUpper ? "prophetic" : "earthly"}
                 zoomLevel={zoomLevel}
-                onClick={() => handleMilestoneClick(m.id)}
+                onClick={() => handleMilestoneClick(m.id, Boolean(m.isAiSuggested))}
               />
             </div>
           );

@@ -102,7 +102,7 @@ function MilestoneConnectorGroup({
           x2={x1}
           y2={centerY + capHeight / 2}
           stroke={color}
-          strokeWidth={capStroke}
+          strokeWidth={capStroke + (highlighted ? 1 : 0.5)}
           vectorEffect="non-scaling-stroke"
         />
         <line
@@ -112,6 +112,7 @@ function MilestoneConnectorGroup({
           y2={centerY + capHeight / 2}
           stroke={color}
           strokeWidth={capStroke}
+          strokeOpacity={0.85}
           vectorEffect="non-scaling-stroke"
         />
         <line

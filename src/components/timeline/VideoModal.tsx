@@ -14,6 +14,7 @@ interface VideoModalProps {
   fragments: Fragment[];
   onClose: () => void;
   onRefresh: () => void;
+  readOnly?: boolean;
 }
 
 export default function VideoModal({
@@ -21,6 +22,7 @@ export default function VideoModal({
   fragments,
   onClose,
   onRefresh,
+  readOnly = false,
 }: VideoModalProps) {
   const playerRef = useRef<{
     seekTo: (amount: number, type?: "seconds" | "fraction") => void;
@@ -87,13 +89,15 @@ export default function VideoModal({
                 <span className="ml-2 text-slate-700">{f.speaker}</span>
                 <p className="mt-1 text-slate-600">{f.rawText}</p>
               </button>
-              <button
-                onClick={() => handleDeleteFragment(f.id)}
-                className="self-start rounded px-2 py-1 text-[10px] text-red-600 hover:bg-red-50"
-                title="Delete fragment"
-              >
-                Delete
-              </button>
+              {!readOnly && (
+                <button
+                  onClick={() => handleDeleteFragment(f.id)}
+                  className="self-start rounded px-2 py-1 text-[10px] text-red-600 hover:bg-red-50"
+                  title="Delete fragment"
+                >
+                  Delete
+                </button>
+              )}
             </li>
           ))}
         </ul>

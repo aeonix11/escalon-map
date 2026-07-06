@@ -1,8 +1,11 @@
 import type { AppDatabase } from "./db";
-import { narratives, milestones, fragments, aiNewsSignals } from "./schema";
+import { narratives, milestones, fragments, aiNewsSignals, rssFeeds } from "./schema";
 import { nowIso } from "./types";
 
 export async function seedIfEmpty(db: AppDatabase) {
+  const configuredFeeds = await db.select().from(rssFeeds).limit(1);
+  if (configuredFeeds.length > 0) return;
+
   const existing = await db.select().from(narratives).limit(1);
   if (existing.length > 0) return;
 

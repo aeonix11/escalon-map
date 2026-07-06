@@ -41,6 +41,7 @@ export const milestones = sqliteTable("milestones", {
   targetDate: text("target_date").notNull(),
   isFuzzy: integer("is_fuzzy", { mode: "boolean" }).notNull().default(false),
   fuzzyRangeMonths: integer("fuzzy_range_months").notNull().default(3),
+  isPersonal: integer("is_personal", { mode: "boolean" }).notNull().default(false),
   hemisphere: text("hemisphere").$type<HemisphereType>().notNull(),
   linkedFragmentId: text("linked_fragment_id").references(() => fragments.id, {
     onDelete: "set null",
@@ -54,6 +55,32 @@ export const rssFeeds = sqliteTable("rss_feeds", {
   label: text("label").notNull(),
   pollIntervalMinutes: integer("poll_interval_minutes").notNull().default(60),
   lastFetched: text("last_fetched"),
+  createdAt: text("created_at").notNull(),
+});
+
+export const notes = sqliteTable("notes", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull().default("Untitled"),
+  content: text("content").notNull().default(""),
+  isPersonal: integer("is_personal", { mode: "boolean" }).notNull().default(false),
+  pinnedDate: text("pinned_date"),
+  hemisphere: text("hemisphere").$type<HemisphereType>(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const milestoneSuggestions = sqliteTable("milestone_suggestions", {
+  id: text("id").primaryKey(),
+  narrativeId: text("narrative_id").references(() => narratives.id, {
+    onDelete: "set null",
+  }),
+  title: text("title").notNull(),
+  description: text("description"),
+  targetDate: text("target_date").notNull(),
+  isFuzzy: integer("is_fuzzy", { mode: "boolean" }).notNull().default(false),
+  fuzzyRangeMonths: integer("fuzzy_range_months").notNull().default(3),
+  hemisphere: text("hemisphere").$type<HemisphereType>().notNull(),
+  reasoning: text("reasoning"),
   createdAt: text("created_at").notNull(),
 });
 
@@ -78,5 +105,7 @@ export const aiNewsSignals = sqliteTable("ai_news_signals", {
 export type Narrative = typeof narratives.$inferSelect;
 export type Fragment = typeof fragments.$inferSelect;
 export type Milestone = typeof milestones.$inferSelect;
+export type MilestoneSuggestion = typeof milestoneSuggestions.$inferSelect;
+export type Note = typeof notes.$inferSelect;
 export type RssFeed = typeof rssFeeds.$inferSelect;
 export type AiNewsSignal = typeof aiNewsSignals.$inferSelect;

@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initDb } from "@/lib/db";
 import { fragments, narratives, milestones } from "@/lib/schema";
 import {
   bufferToEmbedding,
   cosineSimilarity,
   embedQuery,
 } from "@/lib/voyage";
+import { resolveMapContext } from "@/lib/mapContext";
 
 export async function POST(req: NextRequest) {
-  const db = await initDb();
+  const ctx = await resolveMapContext();
+  const db = ctx.db;
   const { query, type } = await req.json();
 
   const queryEmbedding = await embedQuery(query);

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useMapStore } from "@/store/mapStore";
 import TimelineCanvas from "@/components/timeline/TimelineCanvas";
@@ -10,6 +11,7 @@ import VideoModal from "@/components/timeline/VideoModal";
 import AddNarrativeForm from "@/components/forms/AddNarrativeForm";
 import AddMilestoneForm from "@/components/forms/AddMilestoneForm";
 import AddFragmentForm from "@/components/forms/AddFragmentForm";
+import NotesPanel from "@/components/notes/NotesPanel";
 import { useRssPoll } from "@/hooks/useRssPoll";
 import type { AiNewsSignal, RssFeed } from "@/lib/schema";
 
@@ -18,6 +20,7 @@ export default function DashboardContainer() {
     zoomScale,
     setZoomScale,
     setData,
+    setMapContext,
     drawerMode,
     setDrawerMode,
     videoModalOpen,
@@ -26,8 +29,14 @@ export default function DashboardContainer() {
     videoModalFragments,
     activeNarrativeId,
     setActiveNarrativeId,
+    hidePersonalMilestones,
+    toggleHidePersonalMilestones,
     narratives,
+    milestones,
     fragments,
+    notes,
+    activeMapName,
+    readOnly,
   } = useMapStore();
 
   const [signals, setSignals] = useState<AiNewsSignal[]>([]);
@@ -37,49 +46,59 @@ export default function DashboardContainer() {
 
   const refresh = () => setRefreshKey((k) => k + 1);
 
+  const loadSettings = async () => {
+    const res = await fetch("/api/settings");
+    if (!res.ok) return;
+    const data = await res.json();
+    const activeMap =
+      data.maps.find((m: { id: string }) => m.id === data.activeMapId) ??
+      data.maps[0];
+    setMapContext({
+      activeMapId: data.activeMapId,
+      activeMapName: activeMap?.name ?? "My Map",
+      readOnly: data.readOnly,
+      availableMaps: data.maps,
+    });
+  };
+
   const loadData = async () => {
     const res = await fetch("/api/data");
+    if (!res.ok) return;
     const data = await res.json();
+    if (!Array.isArray(data.narratives) || !Array.isArray(data.milestones)) {
+      return;
+    }
     setData({
       narratives: data.narratives,
       milestones: data.milestones,
+      milestoneSuggestions: data.milestoneSuggestions ?? [],
       fragments: data.fragments,
+      notes: data.notes ?? [],
     });
     setSignals(data.signals);
     setFeeds(data.feeds ?? []);
+    if (data.map) {
+      setMapContext({
+        activeMapId: data.map.id,
+        activeMapName: data.map.name,
+        readOnly: !data.map.editable,
+        availableMaps: useMapStore.getState().availableMaps,
+      });
+    }
   };
 
   useEffect(() => {
-    loadData();
+    loadSettings().then(loadData);
   }, [refreshKey]);
 
-  useRssPoll(refresh);
+  useRssPoll(readOnly ? () => {} : refresh);
 
-  const handleExport = async () => {
-    const res = await fetch("/api/export");
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `escalon-map-export.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const text = await file.text();
-    const data = JSON.parse(text);
-    await fetch("/api/export", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...data, mode: "merge" }),
-    });
-    setRefreshKey((k) => k + 1);
-  };
+  const personalMilestoneCount = milestones.filter((m) => m.isPersonal).length;
+  const personalNoteCount = notes.filter((n) => n.isPersonal).length;
+  const personalItemCount = personalMilestoneCount + personalNoteCount;
 
   const handleDeleteNarrative = async (narrativeId: string, title: string) => {
+    if (readOnly) return;
     if (
       !window.confirm(
         `Delete narrative "${title}"? Linked milestones stay on the map but lose this narrative color.`
@@ -106,13 +125,16 @@ export default function DashboardContainer() {
             Escalon Map
           </h1>
           <p className="text-xs text-slate-500">
-            Prophecy &amp; narrative workspace · 2026–2075
+            {activeMapName}
+            {readOnly ? " · view only" : " · your map"} · 2012–2075
           </p>
         </div>
 
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <label className="text-xs text-slate-600">Zoom</label>
+            <label className="text-xs text-slate-600" title="Ctrl + scroll wheel to zoom">
+              Zoom
+            </label>
             <input
               type="range"
               min={1}
@@ -138,23 +160,41 @@ export default function DashboardContainer() {
                 >
                   {n.title}
                 </button>
-                <button
-                  onClick={() => handleDeleteNarrative(n.id, n.title)}
-                  className="ml-0.5 hidden rounded px-1 text-[10px] text-red-600 hover:bg-red-50 group-hover:inline"
-                  title="Delete narrative"
-                >
-                  ×
-                </button>
+                {!readOnly && (
+                  <button
+                    onClick={() => handleDeleteNarrative(n.id, n.title)}
+                    className="ml-0.5 hidden rounded px-1 text-[10px] text-red-600 hover:bg-red-50 group-hover:inline"
+                    title="Delete narrative"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
             ))}
           </div>
 
-          <button
-            onClick={() => setShowForms(!showForms)}
-            className="rounded bg-slate-100 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-200"
-          >
-            {showForms ? "Hide Forms" : "Add Data"}
-          </button>
+          {!readOnly && (
+            <button
+              onClick={() => setShowForms(!showForms)}
+              className="rounded bg-slate-100 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-200"
+            >
+              {showForms ? "Hide Forms" : "Add Data"}
+            </button>
+          )}
+          {!readOnly && (
+            <button
+              onClick={() =>
+                setDrawerMode(drawerMode === "notes" ? null : "notes")
+              }
+              className={`rounded px-3 py-1.5 text-xs ${
+                drawerMode === "notes"
+                  ? "bg-amber-200 text-amber-900 ring-2 ring-amber-300"
+                  : "bg-amber-50 text-amber-800 hover:bg-amber-100"
+              }`}
+            >
+              Notes
+            </button>
+          )}
           <button
             onClick={() =>
               setDrawerMode(drawerMode === "intelligence" ? null : "intelligence")
@@ -164,22 +204,44 @@ export default function DashboardContainer() {
             Map Intelligence
           </button>
           <button
-            onClick={handleExport}
-            className="rounded bg-slate-100 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-200"
+            onClick={toggleHidePersonalMilestones}
+            disabled={personalItemCount === 0}
+            title={
+              personalItemCount === 0
+                ? "No personal milestones or notes to hide"
+                : hidePersonalMilestones
+                  ? "Show personal milestones and notes on the timeline"
+                  : "Hide personal milestones and notes from the timeline"
+            }
+            className={`rounded px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-40 ${
+              hidePersonalMilestones
+                ? "bg-violet-200 text-violet-900 ring-2 ring-violet-300"
+                : "bg-violet-50 text-violet-800 hover:bg-violet-100"
+            }`}
           >
-            Export
+            {hidePersonalMilestones ? "Show personal" : "Hide personal"}
+            {personalItemCount > 0 && (
+              <span className="ml-1 opacity-70">({personalItemCount})</span>
+            )}
           </button>
-          <label className="cursor-pointer rounded bg-slate-100 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-200">
-            Import
-            <input
-              type="file"
-              accept=".json"
-              className="hidden"
-              onChange={handleImport}
-            />
-          </label>
+          <Link
+            href="/settings"
+            className="rounded bg-slate-800 px-3 py-1.5 text-xs text-white hover:bg-slate-700"
+          >
+            Settings
+          </Link>
         </div>
       </header>
+
+      {readOnly && (
+        <div className="border-b border-amber-200 bg-amber-50 px-6 py-2 text-center text-xs text-amber-900">
+          You are viewing a shared map — read only. Switch to <strong>My Map</strong> in{" "}
+          <Link href="/settings" className="underline">
+            Settings
+          </Link>{" "}
+          to edit your own timeline.
+        </div>
+      )}
 
       <div className="relative flex flex-1 overflow-hidden">
         <SignalHub
@@ -187,11 +249,12 @@ export default function DashboardContainer() {
           feeds={feeds}
           narratives={narratives}
           onRefresh={refresh}
+          readOnly={readOnly}
         />
 
-        <main className="flex-1 overflow-hidden">
-          {showForms && (
-            <div className="grid grid-cols-3 gap-3 border-b border-slate-200 bg-white p-4">
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {showForms && !readOnly && (
+            <div className="grid grid-cols-3 gap-3 border-b border-slate-200 bg-white p-4 shrink-0">
               <AddNarrativeForm onCreated={() => setRefreshKey((k) => k + 1)} />
               <AddMilestoneForm
                 narratives={narratives}
@@ -204,11 +267,20 @@ export default function DashboardContainer() {
               />
             </div>
           )}
-          <TimelineCanvas />
+          <div className="min-h-0 flex-1">
+            <TimelineCanvas />
+          </div>
         </main>
 
-        {drawerMode === "detail" && <DetailContextDrawer onRefresh={refresh} />}
-        {drawerMode === "intelligence" && <MapIntelligencePanel />}
+        {drawerMode === "detail" && !readOnly && (
+          <DetailContextDrawer onRefresh={refresh} />
+        )}
+        {drawerMode === "intelligence" && (
+          <MapIntelligencePanel onRefresh={loadData} readOnly={readOnly} />
+        )}
+        {drawerMode === "notes" && (
+          <NotesPanel onRefresh={refresh} readOnly={readOnly} />
+        )}
       </div>
 
       {videoModalOpen && videoModalUrl && (
@@ -217,6 +289,7 @@ export default function DashboardContainer() {
           fragments={videoModalFragments}
           onClose={closeVideoModal}
           onRefresh={refresh}
+          readOnly={readOnly}
         />
       )}
     </div>

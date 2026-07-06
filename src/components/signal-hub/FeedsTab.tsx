@@ -8,6 +8,7 @@ interface FeedsTabProps {
   feeds: RssFeed[];
   onRefresh: () => void;
   expanded?: boolean;
+  readOnly?: boolean;
 }
 
 function formatLastFetched(value: string | null): string {
@@ -21,6 +22,7 @@ export default function FeedsTab({
   feeds,
   onRefresh,
   expanded = false,
+  readOnly = false,
 }: FeedsTabProps) {
   const [url, setUrl] = useState("");
   const [label, setLabel] = useState("");
@@ -155,6 +157,8 @@ export default function FeedsTab({
               {formatLastFetched(feed.lastFetched)}
             </p>
             <div className="mt-2 flex gap-1">
+              {!readOnly && (
+              <>
               <button
                 onClick={() => handleFetchOne(feed.id)}
                 disabled={fetching}
@@ -168,6 +172,8 @@ export default function FeedsTab({
               >
                 Remove
               </button>
+              </>
+              )}
             </div>
           </div>
         ))}
@@ -177,6 +183,12 @@ export default function FeedsTab({
 
   return (
     <div className="flex h-full flex-col">
+      {readOnly && (
+        <p className="border-b border-amber-100 bg-amber-50 px-3 py-2 text-[10px] text-amber-900">
+          View-only map — feed management is disabled.
+        </p>
+      )}
+      {!readOnly && (
       <div className="border-b border-slate-200 p-3 space-y-2">
         <div className="flex items-center justify-between">
           <p className="text-[10px] text-slate-500">
@@ -196,17 +208,22 @@ export default function FeedsTab({
           </p>
         )}
       </div>
+      )}
 
       {expanded ? (
         <div className="flex flex-1 min-h-0 overflow-hidden">
+          {!readOnly && (
           <div className="w-72 shrink-0 border-r border-slate-200 p-3 overflow-y-auto">
             {addForm}
           </div>
+          )}
           <div className="flex-1 overflow-y-auto p-3">{feedCards}</div>
         </div>
       ) : (
         <>
+          {!readOnly && (
           <div className="border-b border-slate-200 p-3">{addForm}</div>
+          )}
           <div className="flex-1 overflow-y-auto p-3">{feedCards}</div>
         </>
       )}

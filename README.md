@@ -2,65 +2,97 @@
 
 Personal dual-hemisphere prophetic/geopolitical timeline workspace for 32-inch desktop monitors (2026–2075).
 
-## Setup
+## Easiest way to start (Windows)
 
-### Windows (PowerShell execution policy blocks scripts)
+### First time only
 
-If `npm` or `.\setup.ps1` fails with *running scripts is disabled*, use **`npm.cmd`** or the batch setup file:
+**Double-click `Install Escalon Map.cmd`**
 
-```cmd
-cd C:\Users\Aenon\Documents\escalon-map
-cmd /c setup.cmd
-cmd /c npm.cmd run dev
-```
+This downloads Node.js automatically (you do **not** need to install Node yourself), installs app dependencies, and creates a desktop shortcut called **Escalon Map**.
 
-In PowerShell, run the batch file with `cmd /c setup.cmd` (or `.\setup.cmd` only works if you use `cmd /c` — PowerShell does not run `.cmd` from the current folder without a path prefix).
+### Every time after that
 
-Or in one line from **cmd.exe** (not PowerShell):
+**Double-click `Open Escalon Map.bat`** or the **Escalon Map** shortcut on your desktop.
 
-```cmd
-cd /d C:\Users\Aenon\Documents\escalon-map && npm.cmd install && npm.cmd run dev
-```
+Keep the black window open while you use the app. Close it to stop.
 
-Optional — allow scripts for **this PowerShell session only** (does not change system policy):
+> If you open `Open Escalon Map.bat` without installing first, it will run the installer for you automatically.
 
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-npm install
-npm run dev
-```
+## Prerequisites
 
-### macOS / Linux
+- Windows 10/11 with internet (for first-time install only)
+- **Node.js is NOT required** — the installer bundles it in `tools/node/`
 
-```bash
-cd ~/Documents/escalon-map
-npm install
-cp .env.example .env.local
-npm run dev
-```
+Mac/Linux users still need [Node.js 20+](https://nodejs.org/) installed manually.
+
+## Manual setup
+
+| Platform | First time | Start app |
+|---|---|---|
+| **Windows** | `cmd /c setup.cmd` | Double-click `Open Escalon Map.bat` or `cmd /c start.cmd` |
+| **macOS / Linux** | `chmod +x setup.sh && ./setup.sh` | `./start.sh` |
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Environment Variables
+## Settings page
 
-| Variable | Required | Description |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | For AI features | Claude signal matching & Map Intelligence chat |
-| `VOYAGE_API_KEY` | For semantic search | Voyage embeddings for fragment/signal matching |
+Click **Settings** in the app (or go to `/settings`).
 
-The app runs without API keys — timeline, forms, and import/export work locally. AI features degrade gracefully.
+### Switch between maps
+
+- **My Map** — your editable timeline
+- **Shared maps** — view-only copies of other people's exports; your map is never changed
+
+Use the dropdown **“Which map are you viewing?”** to switch.
+
+### Share a map
+
+1. Settings → **Export my map** → download the `.json` file
+2. Send the file to someone else
+3. They use Settings → **Add someone else's map** to upload it
+
+No more merging imports into your own timeline.
+
+### API keys (optional)
+
+Enter keys in Settings. They are saved locally in `data/settings.json`.
+
+| Key | Used for |
+|---|---|
+| Anthropic | Map Intelligence chat & signal matching |
+| Voyage | Semantic search |
+
+The app works without API keys — timeline editing and map switching still work.
 
 ## Features
 
 - **Dual-hemisphere timeline** — prophetic above, earthly signals below
+- **Multiple maps** — keep your map and browse shared maps side by side
 - **Semantic zoom** — decadal / yearly / seasonal density levels
 - **Narrative spotlight** — highlight a thread with SVG bezier connectors
-- **Fuzzy date gradients** — uncertain windows render as translucent bands
-- **Video modal** — YouTube deep-links to exact timestamp seconds
-- **Signal tray** — AI news matching via Voyage + Claude RAG pipeline
-- **Map Intelligence** — chat with your entire timeline
-- **Import/Export** — share maps as JSON files
+- **Signal tray** — AI news matching (with API keys)
+- **Map Intelligence** — chat with a timeline (with API keys)
+- **Import/Export** — share maps as JSON files without overwriting yours
+
+## Optional: background RSS polling (Windows)
+
+```cmd
+cmd /c setup-scheduler.cmd
+```
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| "Node.js not installed" | Run **`Install Escalon Map.cmd`** first |
+| Install download fails | Check internet; run installer again |
+| `npm` blocked in PowerShell | Use the `.cmd` / `.bat` files instead |
+| Port 3000 in use | Run `npm run dev -- -p 3001` |
+| Fresh empty map | Delete `data/maps/my-map.db` and restart |
+| Reset API keys | Edit or delete `data/settings.json` |
 
 ## Database
 
-Local SQLite file (`escalon.db`) managed by Drizzle ORM + **sql.js** (pure WASM — no Visual Studio / native build tools required on Windows).
+Local SQLite (`data/maps/my-map.db`) via Drizzle ORM + **sql.js** (no native build tools required on Windows).
+
+Legacy `escalon.db` in the project root is migrated automatically to `data/maps/my-map.db` on first run.

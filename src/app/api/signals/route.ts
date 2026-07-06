@@ -1,18 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { initDb, persistDb } from "@/lib/db";
 import { aiNewsSignals, milestones } from "@/lib/schema";
 import { embedText, embeddingToBuffer } from "@/lib/voyage";
 import { nowIso } from "@/lib/types";
+import {
+  persistIfEditable,
+  readOnlyResponse,
+  resolveMapContext,
+} from "@/lib/mapContext";
 
 export async function GET() {
-  const db = await initDb();
-  const signals = await db.select().from(aiNewsSignals);
+  const ctx = await resolveMapContext();
+  const signals = await ctx.db.select().from(aiNewsSignals);
   return NextResponse.json(signals);
 }
 
 export async function POST(req: NextRequest) {
-  const db = await initDb();
+  const ctx = await resolveMapContext();
+  if (!ctx.editable) return readOnlyResponse();
+
+  const db = ctx.db;
   const body = await req.json();
 
   if (body.action === "create") {
@@ -31,7 +38,7 @@ export async function POST(req: NextRequest) {
       status: "PENDING",
       createdAt: nowIso(),
     });
-    persistDb();
+    persistIfEditable(ctx);
     return NextResponse.json({ id });
   }
 
@@ -62,7 +69,7 @@ export async function POST(req: NextRequest) {
       .set({ status: "ACCEPTED" })
       .where(eq(aiNewsSignals.id, body.signalId));
 
-    persistDb();
+    persistIfEditable(ctx);
     return NextResponse.json({ milestoneId });
   }
 
@@ -71,7 +78,7 @@ export async function POST(req: NextRequest) {
       .update(aiNewsSignals)
       .set({ status: "DISMISSED" })
       .where(eq(aiNewsSignals.id, body.signalId));
-    persistDb();
+    persistIfEditable(ctx);
     return NextResponse.json({ ok: true });
   }
 

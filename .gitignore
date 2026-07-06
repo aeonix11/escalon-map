@@ -35,6 +35,12 @@ yarn-error.log*
 *.db
 *.db-journal
 
+# local app data (maps, settings, API keys)
+/data/
+
+# bundled Node.js (installed by install.ps1)
+/tools/node/
+
 # typescript
 next-env.d.ts
 

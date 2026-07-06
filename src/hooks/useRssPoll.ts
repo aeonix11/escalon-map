@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 
 /**
  * On app mount, fetch any RSS feeds that are stale (respecting per-feed intervals).
- * Background polling is handled by Windows Task Scheduler via poll.cmd.
+ * Background polling is handled by Windows Task Scheduler via poll-silent.vbs.
  */
 export function useRssPoll(onRefresh: () => void) {
   const ran = useRef(false);
