@@ -149,17 +149,20 @@ cmd /c setup-scheduler.cmd
 | "Node.js not installed" | Run **`Install Escalon Map.cmd`** first |
 | Install download fails | Check internet; run installer again |
 | `npm` blocked in PowerShell | Use the `.cmd` / `.bat` files instead |
-| Port 3000 in use | Close other apps on port 3000, or run `npm run start -- -p 3001` |
+| `build.cmd` not found in PowerShell | Run `.\build.cmd` (the `.\` prefix is required) |
+| Port 3000 in use | Close other Escalon Map windows, or run `npm run start -- -p 3001` |
 | Fresh empty map | Delete `data/maps/my-map.db` and restart |
 | Reset API keys | Edit or delete `data/settings.json` |
-| App feels slow on first open | Run `build.cmd` once, then use `Open Escalon Map.bat` (production mode) |
+| App feels slow on first open | Run `.\build.cmd` once, then use `Open Escalon Map.bat` (production mode) |
+| `Cannot find module './NNN.js'` | Close the app, run `.\build.cmd`, then open again (stale build cache) |
+| Black window opens and closes | Use **Open Escalon Map.bat** directly; run `.\build.cmd` first if needed |
 | Shared map won't update | Re-export from the owner and re-import the new `.json` file |
 
 ## Before you share publicly
 
 - **Rotate API keys** if `data/settings.json` was ever copied or zipped with the project
 - Confirm `data/` is **not** in git: `git ls-files data` should return nothing
-- Run `build.cmd` after updates so friends get a production build
+- Run `.\build.cmd` after updates so friends get a production build
 - Export maps as `.json` only — personal milestones are excluded unless you check the box
 
 ## Database

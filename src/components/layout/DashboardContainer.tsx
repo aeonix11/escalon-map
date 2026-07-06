@@ -115,11 +115,15 @@ export default function DashboardContainer() {
     ) {
       return;
     }
-    await fetch("/api/delete", {
+    const res = await fetch("/api/delete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: "narrative", id: narrativeId }),
     });
+    if (!res.ok) {
+      setLoadError("Could not delete narrative. Try refreshing the page.");
+      return;
+    }
     if (activeNarrativeId === narrativeId) {
       setActiveNarrativeId(null);
     }

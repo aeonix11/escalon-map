@@ -38,6 +38,18 @@ export async function POST(req: NextRequest) {
   }
 
   if (type === "narrative") {
+    await db
+      .update(milestones)
+      .set({ narrativeId: null })
+      .where(eq(milestones.narrativeId, id));
+    await db
+      .update(aiNewsSignals)
+      .set({ matchedNarrativeId: null })
+      .where(eq(aiNewsSignals.matchedNarrativeId, id));
+    await db
+      .update(milestoneSuggestions)
+      .set({ narrativeId: null })
+      .where(eq(milestoneSuggestions.narrativeId, id));
     await db.delete(fragmentNarratives).where(eq(fragmentNarratives.narrativeId, id));
     await db.delete(narratives).where(eq(narratives.id, id));
     persistIfEditable(ctx);

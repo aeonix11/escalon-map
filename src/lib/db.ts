@@ -121,11 +121,15 @@ async function createSqliteFromFile(dbPath: string): Promise<SqlJsDatabase> {
     locateFile: (file) => path.join(wasmDir, file),
   });
 
+  let sqlite: SqlJsDatabase;
   if (fs.existsSync(dbPath)) {
     const fileBuffer = fs.readFileSync(dbPath);
-    return new SQL.Database(fileBuffer);
+    sqlite = new SQL.Database(fileBuffer);
+  } else {
+    sqlite = new SQL.Database();
   }
-  return new SQL.Database();
+  sqlite.exec("PRAGMA foreign_keys = ON;");
+  return sqlite;
 }
 
 async function createEmptySqlite(): Promise<SqlJsDatabase> {
@@ -133,7 +137,9 @@ async function createEmptySqlite(): Promise<SqlJsDatabase> {
   const SQL = await initSqlJs({
     locateFile: (file) => path.join(wasmDir, file),
   });
-  return new SQL.Database();
+  const sqlite = new SQL.Database();
+  sqlite.exec("PRAGMA foreign_keys = ON;");
+  return sqlite;
 }
 
 function runMigrations(sqlite: SqlJsDatabase) {

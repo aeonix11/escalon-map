@@ -85,7 +85,8 @@ $shortcutPath = Join-Path $desktop "Escalon Map.lnk"
 try {
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($shortcutPath)
-    $shortcut.TargetPath = $launcher
+    $shortcut.TargetPath = "cmd.exe"
+    $shortcut.Arguments = "/k `"$launcher`" RUN"
     $shortcut.WorkingDirectory = $Root
     $shortcut.Description = "Escalon Map timeline workspace"
     $shortcut.Save()
