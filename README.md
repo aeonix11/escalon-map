@@ -60,7 +60,7 @@ Enter keys in Settings. They are saved locally in `data/settings.json`.
 | Key | Used for |
 |---|---|
 | Anthropic | Map Intelligence chat & signal matching |
-| Voyage | Semantic search |
+| Voyage | Semantic search | - *not working so ignore for now.
 
 The app works without API keys — timeline editing and map switching still work.
 
