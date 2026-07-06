@@ -91,6 +91,9 @@ const CREATE_TABLES_SQL = `
     fuzzy_range_months INTEGER NOT NULL DEFAULT 3,
     hemisphere TEXT NOT NULL,
     reasoning TEXT,
+    sources_json TEXT NOT NULL DEFAULT '[]',
+    tier TEXT NOT NULL DEFAULT 'inferred',
+    confirms_milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL
   );
 
@@ -113,7 +116,10 @@ const CREATE_TABLES_SQL = `
     id TEXT PRIMARY KEY,
     analysis_text TEXT NOT NULL,
     suggestions_json TEXT NOT NULL DEFAULT '[]',
+    health_json TEXT NOT NULL DEFAULT '[]',
     model TEXT,
+    mode TEXT NOT NULL DEFAULT 'quick',
+    scope_narrative_id TEXT,
     suggestion_count INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL
   );
@@ -213,11 +219,82 @@ function runMigrations(sqlite: SqlJsDatabase) {
       id TEXT PRIMARY KEY,
       analysis_text TEXT NOT NULL,
       suggestions_json TEXT NOT NULL DEFAULT '[]',
+      health_json TEXT NOT NULL DEFAULT '[]',
       model TEXT,
+      mode TEXT NOT NULL DEFAULT 'quick',
+      scope_narrative_id TEXT,
       suggestion_count INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL
     );
   `);
+
+  const suggestionColumns = sqlite.exec("PRAGMA table_info(milestone_suggestions)");
+  const suggestionColNames =
+    suggestionColumns.length > 0
+      ? suggestionColumns[0].values.map((row) => row[1] as string)
+      : [];
+
+  if (!suggestionColNames.includes("sources_json")) {
+    try {
+      sqlite.exec(
+        "ALTER TABLE milestone_suggestions ADD COLUMN sources_json TEXT NOT NULL DEFAULT '[]'"
+      );
+    } catch {
+      // column may already exist
+    }
+  }
+  if (!suggestionColNames.includes("tier")) {
+    try {
+      sqlite.exec(
+        "ALTER TABLE milestone_suggestions ADD COLUMN tier TEXT NOT NULL DEFAULT 'inferred'"
+      );
+    } catch {
+      // column may already exist
+    }
+  }
+  if (!suggestionColNames.includes("confirms_milestone_id")) {
+    try {
+      sqlite.exec(
+        "ALTER TABLE milestone_suggestions ADD COLUMN confirms_milestone_id TEXT REFERENCES milestones(id) ON DELETE SET NULL"
+      );
+    } catch {
+      // column may already exist
+    }
+  }
+
+  const runColumns = sqlite.exec("PRAGMA table_info(deep_analysis_runs)");
+  const runColNames =
+    runColumns.length > 0
+      ? runColumns[0].values.map((row) => row[1] as string)
+      : [];
+
+  if (!runColNames.includes("health_json")) {
+    try {
+      sqlite.exec(
+        "ALTER TABLE deep_analysis_runs ADD COLUMN health_json TEXT NOT NULL DEFAULT '[]'"
+      );
+    } catch {
+      // column may already exist
+    }
+  }
+  if (!runColNames.includes("mode")) {
+    try {
+      sqlite.exec(
+        "ALTER TABLE deep_analysis_runs ADD COLUMN mode TEXT NOT NULL DEFAULT 'quick'"
+      );
+    } catch {
+      // column may already exist
+    }
+  }
+  if (!runColNames.includes("scope_narrative_id")) {
+    try {
+      sqlite.exec(
+        "ALTER TABLE deep_analysis_runs ADD COLUMN scope_narrative_id TEXT"
+      );
+    } catch {
+      // column may already exist
+    }
+  }
 }
 
 async function loadDatabaseMap(mapId: string): Promise<DbCacheEntry> {

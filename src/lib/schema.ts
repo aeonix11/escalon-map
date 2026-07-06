@@ -69,6 +69,9 @@ export const notes = sqliteTable("notes", {
   updatedAt: text("updated_at").notNull(),
 });
 
+export type SuggestionTier = "sourced" | "inferred" | "speculative";
+export type DeepAnalysisMode = "quick" | "deep";
+
 export const milestoneSuggestions = sqliteTable("milestone_suggestions", {
   id: text("id").primaryKey(),
   narrativeId: text("narrative_id").references(() => narratives.id, {
@@ -81,6 +84,12 @@ export const milestoneSuggestions = sqliteTable("milestone_suggestions", {
   fuzzyRangeMonths: integer("fuzzy_range_months").notNull().default(3),
   hemisphere: text("hemisphere").$type<HemisphereType>().notNull(),
   reasoning: text("reasoning"),
+  sourcesJson: text("sources_json").notNull().default("[]"),
+  tier: text("tier").$type<SuggestionTier>().notNull().default("inferred"),
+  confirmsMilestoneId: text("confirms_milestone_id").references(
+    () => milestones.id,
+    { onDelete: "set null" }
+  ),
   createdAt: text("created_at").notNull(),
 });
 
@@ -88,7 +97,10 @@ export const deepAnalysisRuns = sqliteTable("deep_analysis_runs", {
   id: text("id").primaryKey(),
   analysisText: text("analysis_text").notNull(),
   suggestionsJson: text("suggestions_json").notNull().default("[]"),
+  healthJson: text("health_json").notNull().default("[]"),
   model: text("model"),
+  mode: text("mode").$type<DeepAnalysisMode>().notNull().default("quick"),
+  scopeNarrativeId: text("scope_narrative_id"),
   suggestionCount: integer("suggestion_count").notNull().default(0),
   createdAt: text("created_at").notNull(),
 });

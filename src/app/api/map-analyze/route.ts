@@ -1,7 +1,24 @@
-import { NextResponse } from "next/server";
-import { narratives, milestones, fragments, milestoneSuggestions, notes, deepAnalysisRuns } from "@/lib/schema";
-import { streamMapDeepAnalysis, getClaudeModelId } from "@/lib/anthropic";
-import { parseMapDeepAnalysis } from "@/lib/mapAnalysis";
+import { NextRequest, NextResponse } from "next/server";
+import {
+  narratives,
+  milestones,
+  fragments,
+  fragmentNarratives,
+  milestoneSuggestions,
+  notes,
+} from "@/lib/schema";
+import {
+  streamMapDeepAnalysis,
+  getClaudeModelId,
+  type DeepAnalysisOptions,
+  type DeepModelChoice,
+  type DeepAnalysisMode,
+} from "@/lib/anthropic";
+import {
+  parseMapDeepAnalysis,
+  verifySuggestionSources,
+  type SearchResultLogEntry,
+} from "@/lib/mapAnalysis";
 import { saveDeepAnalysisRun } from "@/lib/deepAnalysisHistory";
 import { serializeMapContext } from "@/lib/mapSerialize";
 import {
@@ -9,22 +26,82 @@ import {
   resolveMapContext,
 } from "@/lib/mapContext";
 
-export async function POST() {
+interface AnalyzeRequestBody {
+  mode?: DeepAnalysisMode;
+  model?: DeepModelChoice;
+  maxSearches?: number;
+  narrativeId?: string | null;
+}
+
+export async function POST(req: NextRequest) {
   const ctx = await resolveMapContext();
 
-  const [allNarratives, allMilestones, allFragments, allNotes] = await Promise.all([
+  let body: AnalyzeRequestBody = {};
+  try {
+    body = (await req.json()) as AnalyzeRequestBody;
+  } catch {
+    // empty body is fine — defaults to quick mode
+  }
+
+  const mode: DeepAnalysisMode = body.mode === "deep" ? "deep" : "quick";
+  const model: DeepModelChoice = body.model ?? "sonnet-4-6";
+  const maxSearches =
+    typeof body.maxSearches === "number"
+      ? Math.max(1, Math.min(body.maxSearches, 20))
+      : mode === "deep"
+        ? model === "fable-5"
+          ? 8
+          : model === "sonnet-5"
+            ? 6
+            : 5
+        : 0;
+  const scopeNarrativeId = body.narrativeId?.trim() || null;
+
+  const [
+    allNarratives,
+    allMilestones,
+    allFragments,
+    allNotes,
+    allFragmentNarratives,
+  ] = await Promise.all([
     ctx.db.select().from(narratives),
     ctx.db.select().from(milestones),
     ctx.db.select().from(fragments),
     ctx.db.select().from(notes),
+    ctx.db.select().from(fragmentNarratives),
   ]);
 
+  let filteredNarratives = allNarratives;
+  let filteredMilestones = allMilestones;
+  let filteredFragments = allFragments;
+
+  if (scopeNarrativeId) {
+    filteredNarratives = allNarratives.filter((n) => n.id === scopeNarrativeId);
+    filteredMilestones = allMilestones.filter(
+      (m) => m.narrativeId === scopeNarrativeId
+    );
+    const linkedFragmentIds = new Set(
+      allFragmentNarratives
+        .filter((fn) => fn.narrativeId === scopeNarrativeId)
+        .map((fn) => fn.fragmentId)
+    );
+    filteredFragments = allFragments.filter((f) => linkedFragmentIds.has(f.id));
+  }
+
   const mapContext = serializeMapContext(
-    allNarratives,
-    allMilestones,
-    allFragments,
+    filteredNarratives,
+    filteredMilestones,
+    filteredFragments,
     allNotes
   );
+
+  const searchLog: SearchResultLogEntry[] = [];
+  const analysisOptions: DeepAnalysisOptions = {
+    mode,
+    model: mode === "deep" ? model : undefined,
+    maxSearches: mode === "deep" ? maxSearches : undefined,
+    searchLog,
+  };
 
   const stream = new TransformStream();
   const writer = stream.writable.getWriter();
@@ -35,11 +112,12 @@ export async function POST() {
     try {
       const textStream = await streamMapDeepAnalysis(
         mapContext,
-        allNarratives.map((n) => ({
+        filteredNarratives.map((n) => ({
           id: n.id,
           title: n.title,
           description: n.description,
-        }))
+        })),
+        analysisOptions
       );
 
       for await (const chunk of textStream) {
@@ -47,14 +125,26 @@ export async function POST() {
         await writer.write(encoder.encode(chunk));
       }
 
-      const { analysis, suggestions } = parseMapDeepAnalysis(fullText);
+      const parsed = parseMapDeepAnalysis(fullText);
+      let suggestions = parsed.suggestions;
+      if (mode === "deep" && searchLog.length > 0) {
+        suggestions = verifySuggestionSources(suggestions, searchLog);
+      }
 
-      if (ctx.editable && analysis.trim()) {
+      const modelUsed =
+        mode === "deep" ? getClaudeModelId(model) : getClaudeModelId();
+
+      if (ctx.editable && parsed.analysis.trim()) {
         await saveDeepAnalysisRun(
           ctx.db,
-          analysis,
+          parsed.analysis,
           suggestions,
-          getClaudeModelId()
+          modelUsed,
+          {
+            mode,
+            health: parsed.health,
+            scopeNarrativeId,
+          }
         );
         persistIfEditable(ctx);
       }
@@ -74,14 +164,21 @@ export async function POST() {
               fuzzyRangeMonths: item.fuzzyRangeMonths,
               hemisphere: item.hemisphere,
               reasoning: item.reasoning || null,
+              sourcesJson: JSON.stringify(item.sources ?? []),
+              tier: item.tier ?? "inferred",
+              confirmsMilestoneId: item.confirmsMilestoneId ?? null,
               createdAt: now,
             });
           }
           persistIfEditable(ctx);
         }
+        const healthNote =
+          parsed.health.length > 0
+            ? ` Found ${parsed.health.length} map health issue(s).`
+            : "";
         await writer.write(
           encoder.encode(
-            `\n\n---\nParsed ${suggestions.length} timeline suggestion(s).${
+            `\n\n---\nParsed ${suggestions.length} timeline suggestion(s).${healthNote}${
               ctx.editable
                 ? " They are now on your timeline as AI-suggested boxes."
                 : ""
@@ -105,4 +202,3 @@ export async function POST() {
     },
   });
 }
-

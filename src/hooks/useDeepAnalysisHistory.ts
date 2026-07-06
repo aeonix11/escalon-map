@@ -1,10 +1,13 @@
 import { useCallback, useState } from "react";
-import type { MapMilestoneSuggestion } from "@/lib/mapAnalysis";
+import type { MapHealthIssue, MapMilestoneSuggestion } from "@/lib/mapAnalysis";
+import type { DeepAnalysisMode } from "@/lib/anthropic";
 
 export interface DeepAnalysisRunSummary {
   id: string;
   preview: string;
   model: string | null;
+  mode: DeepAnalysisMode;
+  scopeNarrativeId: string | null;
   suggestionCount: number;
   createdAt: string;
 }
@@ -12,6 +15,7 @@ export interface DeepAnalysisRunSummary {
 export interface DeepAnalysisRunDetail extends DeepAnalysisRunSummary {
   analysisText: string;
   suggestions: MapMilestoneSuggestion[];
+  health: MapHealthIssue[];
 }
 
 export function useDeepAnalysisHistory() {
@@ -37,7 +41,9 @@ export function useDeepAnalysisHistory() {
   const loadRun = useCallback(async (id: string) => {
     setLoadingDetail(true);
     try {
-      const res = await fetch(`/api/deep-analysis-history?id=${encodeURIComponent(id)}`);
+      const res = await fetch(
+        `/api/deep-analysis-history?id=${encodeURIComponent(id)}`
+      );
       if (!res.ok) return;
       const data = await res.json();
       if (data.run) setSelectedRun(data.run);

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { desc, eq } from "drizzle-orm";
 import { deepAnalysisRuns } from "@/lib/schema";
-import { parseStoredSuggestions } from "@/lib/deepAnalysisHistory";
+import {
+  parseStoredHealth,
+  parseStoredSuggestions,
+} from "@/lib/deepAnalysisHistory";
 import {
   persistIfEditable,
   resolveMapContext,
@@ -27,7 +30,10 @@ export async function GET(req: NextRequest) {
         id: run.id,
         analysisText: run.analysisText,
         suggestions: parseStoredSuggestions(run.suggestionsJson),
+        health: parseStoredHealth(run.healthJson),
         model: run.model,
+        mode: run.mode ?? "quick",
+        scopeNarrativeId: run.scopeNarrativeId ?? null,
         suggestionCount: run.suggestionCount,
         createdAt: run.createdAt,
       },
@@ -39,6 +45,8 @@ export async function GET(req: NextRequest) {
       id: deepAnalysisRuns.id,
       preview: deepAnalysisRuns.analysisText,
       model: deepAnalysisRuns.model,
+      mode: deepAnalysisRuns.mode,
+      scopeNarrativeId: deepAnalysisRuns.scopeNarrativeId,
       suggestionCount: deepAnalysisRuns.suggestionCount,
       createdAt: deepAnalysisRuns.createdAt,
     })
@@ -50,6 +58,8 @@ export async function GET(req: NextRequest) {
       id: r.id,
       preview: r.preview.slice(0, 200),
       model: r.model,
+      mode: r.mode ?? "quick",
+      scopeNarrativeId: r.scopeNarrativeId ?? null,
       suggestionCount: r.suggestionCount,
       createdAt: r.createdAt,
     })),
