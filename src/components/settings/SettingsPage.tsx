@@ -32,6 +32,10 @@ export default function SettingsPage() {
 
   const loadSettings = async () => {
     const res = await fetch("/api/settings");
+    if (!res.ok) {
+      setMessage("Could not load settings. Try refreshing the page.");
+      return;
+    }
     const data = (await res.json()) as SettingsResponse;
     setSettings(data);
     setActiveMapId(data.activeMapId);
@@ -57,6 +61,10 @@ export default function SettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      if (!res.ok) {
+        setMessage("Could not save settings.");
+        return;
+      }
       const data = (await res.json()) as SettingsResponse;
       setSettings(data);
       setActiveMapId(data.activeMapId);

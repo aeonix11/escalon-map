@@ -44,6 +44,16 @@ echo Starting Escalon Map...
 echo Keep this window open while you use the app.
 echo Close it to stop the app.
 echo.
+if not exist .next\BUILD_ID (
+  echo Building app for production (first time only, may take a minute)...
+  call npm.cmd run build
+  if errorlevel 1 (
+    echo.
+    echo Build failed. See errors above.
+    pause
+    exit /b 1
+  )
+)
 start "" http://localhost:3000
-call npm.cmd run dev
+call npm.cmd run start
 pause

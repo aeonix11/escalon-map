@@ -3,6 +3,7 @@ import type { AppDatabase } from "@/lib/db";
 import { aiNewsSignals, rssFeeds, type RssFeed } from "@/lib/schema";
 import { nowIso } from "@/lib/types";
 import { parseRssXml } from "@/lib/rss";
+import { isSafePublicHttpUrl } from "@/lib/urlSafety";
 
 export function isFeedStale(feed: RssFeed, force = false): boolean {
   if (force) return true;
@@ -17,6 +18,10 @@ export async function fetchFeedItems(url: string): Promise<{
   items: ReturnType<typeof parseRssXml>;
   error?: string;
 }> {
+  if (!isSafePublicHttpUrl(url)) {
+    return { items: [], error: "Feed URL must be a public http(s) address" };
+  }
+
   try {
     const res = await fetch(url, {
       headers: {

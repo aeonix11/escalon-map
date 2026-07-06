@@ -43,12 +43,16 @@ export default function DashboardContainer() {
   const [feeds, setFeeds] = useState<RssFeed[]>([]);
   const [showForms, setShowForms] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = () => setRefreshKey((k) => k + 1);
 
   const loadSettings = async () => {
     const res = await fetch("/api/settings");
-    if (!res.ok) return;
+    if (!res.ok) {
+      setLoadError("Could not load settings. Try refreshing the page.");
+      return;
+    }
     const data = await res.json();
     const activeMap =
       data.maps.find((m: { id: string }) => m.id === data.activeMapId) ??
@@ -63,11 +67,16 @@ export default function DashboardContainer() {
 
   const loadData = async () => {
     const res = await fetch("/api/data");
-    if (!res.ok) return;
-    const data = await res.json();
-    if (!Array.isArray(data.narratives) || !Array.isArray(data.milestones)) {
+    if (!res.ok) {
+      setLoadError("Could not load your map data. Try refreshing the page.");
       return;
     }
+    const data = await res.json();
+    if (!Array.isArray(data.narratives) || !Array.isArray(data.milestones)) {
+      setLoadError("Map data looks corrupted. Try restarting the app.");
+      return;
+    }
+    setLoadError(null);
     setData({
       narratives: data.narratives,
       milestones: data.milestones,
@@ -240,6 +249,12 @@ export default function DashboardContainer() {
             Settings
           </Link>{" "}
           to edit your own timeline.
+        </div>
+      )}
+
+      {loadError && (
+        <div className="border-b border-red-200 bg-red-50 px-6 py-2 text-center text-xs text-red-900">
+          {loadError}
         </div>
       )}
 

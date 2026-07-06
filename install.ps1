@@ -12,7 +12,7 @@ Write-Host "========================================"
 Write-Host ""
 
 if (-not (Test-Path $NodeExe)) {
-    Write-Host "Step 1/3: Downloading Node.js $NodeVersion (about 30 MB, one-time only)..."
+    Write-Host "Step 1/4: Downloading Node.js $NodeVersion (about 30 MB, one-time only)..."
     Write-Host "This may take a minute depending on your internet connection."
     Write-Host ""
 
@@ -44,13 +44,13 @@ if (-not (Test-Path $NodeExe)) {
     Write-Host "Node.js installed."
 }
 else {
-    Write-Host "Step 1/3: Node.js already installed - skipping download."
+    Write-Host "Step 1/4: Node.js already installed - skipping download."
 }
 
 $env:PATH = "$NodeDir;$env:PATH"
 
 Write-Host ""
-Write-Host "Step 2/3: Installing app dependencies..."
+Write-Host "Step 2/4: Installing app dependencies..."
 Set-Location $Root
 
 & npm.cmd install
@@ -66,7 +66,17 @@ if (-not (Test-Path (Join-Path $Root ".env.local"))) {
 }
 
 Write-Host ""
-Write-Host "Step 3/3: Creating desktop shortcut..."
+Write-Host "Step 3/4: Building app for production..."
+& npm.cmd run build
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ""
+    Write-Host "ERROR: Production build failed."
+    Read-Host "Press Enter to exit"
+    exit $LASTEXITCODE
+}
+
+Write-Host ""
+Write-Host "Step 4/4: Creating desktop shortcut..."
 
 $launcher = Join-Path $Root "Open Escalon Map.bat"
 $desktop = [Environment]::GetFolderPath("Desktop")

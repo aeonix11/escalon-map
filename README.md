@@ -53,6 +53,19 @@ Use the dropdown **“Which map are you viewing?”** to switch.
 
 No more merging imports into your own timeline.
 
+### Sharing with friends
+
+**What to send:** the app folder (or a GitHub link) plus an exported `.json` map file.
+
+**Never send your `data/` folder** — it contains your private timeline database and API keys.
+
+**Recipient steps:**
+1. Run `Install Escalon Map.cmd` (Windows)
+2. Open the app → Settings → **Add someone else's map**
+3. Select the `.json` file you sent them
+
+Their own map stays separate. Yours is view-only on their machine.
+
 ### API keys (optional)
 
 Enter keys in Settings. They are saved locally in `data/settings.json`.
@@ -87,9 +100,18 @@ cmd /c setup-scheduler.cmd
 | "Node.js not installed" | Run **`Install Escalon Map.cmd`** first |
 | Install download fails | Check internet; run installer again |
 | `npm` blocked in PowerShell | Use the `.cmd` / `.bat` files instead |
-| Port 3000 in use | Run `npm run dev -- -p 3001` |
+| Port 3000 in use | Close other apps on port 3000, or run `npm run start -- -p 3001` |
 | Fresh empty map | Delete `data/maps/my-map.db` and restart |
 | Reset API keys | Edit or delete `data/settings.json` |
+| App feels slow on first open | Run `build.cmd` once, then use `Open Escalon Map.bat` (production mode) |
+| Shared map won't update | Re-export from the owner and re-import the new `.json` file |
+
+## Before you share publicly
+
+- **Rotate API keys** if `data/settings.json` was ever copied or zipped with the project
+- Confirm `data/` is **not** in git: `git ls-files data` should return nothing
+- Run `build.cmd` after updates so friends get a production build
+- Export maps as `.json` only — personal milestones are excluded unless you check the box
 
 ## Database
 

@@ -125,11 +125,16 @@ export default function MapIntelligencePanel({
             </p>
             <button
               onClick={() => void handleRunAnalysis()}
-              disabled={deep.running}
+              disabled={deep.running || readOnly}
               className="w-full rounded bg-violet-600 py-2 text-xs font-medium text-white hover:bg-violet-500 disabled:opacity-50"
             >
               {deep.running ? "Running deep analysis…" : "Run deep analysis"}
             </button>
+            {readOnly && (
+              <p className="text-[10px] text-amber-800">
+                Switch to My Map in Settings to run deep analysis on your own timeline.
+              </p>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto p-3 space-y-3">

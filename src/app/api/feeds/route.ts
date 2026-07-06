@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { rssFeeds } from "@/lib/schema";
 import { nowIso } from "@/lib/types";
 import { pollFeed } from "@/lib/feedService";
+import { isSafePublicHttpUrl } from "@/lib/urlSafety";
 import {
   persistIfEditable,
   readOnlyResponse,
@@ -44,6 +45,12 @@ export async function POST(req: NextRequest) {
     if (!url || !label) {
       return NextResponse.json(
         { error: "url and label are required" },
+        { status: 400 }
+      );
+    }
+    if (!isSafePublicHttpUrl(url)) {
+      return NextResponse.json(
+        { error: "Feed URL must be a public http(s) address" },
         { status: 400 }
       );
     }
