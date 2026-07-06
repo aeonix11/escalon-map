@@ -47,5 +47,9 @@ escalon.db
 # typescript
 next-env.d.ts
 
+# debug output / build cache
+db-inspect.json
+tsconfig.tsbuildinfo
+
 # drizzle
 drizzle/
