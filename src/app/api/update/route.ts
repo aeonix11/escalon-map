@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
       isFuzzy: boolean;
       fuzzyRangeMonths: number;
       isPersonal: boolean;
+      isSpeculative: boolean;
     }> = {};
 
     if ("linkedFragmentId" in data) {
@@ -67,6 +68,7 @@ export async function POST(req: NextRequest) {
     }
     if ("isFuzzy" in data) updates.isFuzzy = Boolean(data.isFuzzy);
     if ("isPersonal" in data) updates.isPersonal = Boolean(data.isPersonal);
+    if ("isSpeculative" in data) updates.isSpeculative = Boolean(data.isSpeculative);
     if ("fuzzyRangeMonths" in data) {
       const months = Number(data.fuzzyRangeMonths);
       if (!Number.isFinite(months) || months < 1 || months > 120) {

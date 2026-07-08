@@ -8,6 +8,7 @@ import type {
   DeepAnalysisMode,
   DeepModelChoice,
 } from "@/lib/anthropic";
+import { DEEP_STATUS_MARKER, formatDeepStatus } from "@/lib/deepAnalysisStream";
 import type { MilestoneSuggestion } from "@/lib/schema";
 
 export interface DeepAnalysisRunOptions {
@@ -17,9 +18,23 @@ export interface DeepAnalysisRunOptions {
   narrativeId: string | null;
 }
 
+function stripDeepStreamMarkers(text: string): {
+  clean: string;
+  status: string | null;
+} {
+  let status: string | null = null;
+  const clean = text.replace(DEEP_STATUS_MARKER, (match) => {
+    status = match.slice("__STATUS__".length, -"__".length);
+    return "";
+  });
+  return { clean, status };
+}
+
 export function useMapDeepAnalysis() {
   const [running, setRunning] = useState(false);
   const [rawOutput, setRawOutput] = useState("");
+  const [runStatus, setRunStatus] = useState<string | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState("");
   const [health, setHealth] = useState<MapHealthIssue[]>([]);
   const [suggestions, setSuggestions] = useState<MapMilestoneSuggestion[]>([]);
@@ -33,6 +48,8 @@ export function useMapDeepAnalysis() {
     ) => {
       setRunning(true);
       setRawOutput("");
+      setRunStatus(null);
+      setRunError(null);
       setAnalysis("");
       setHealth([]);
       setSuggestions([]);
@@ -51,7 +68,7 @@ export function useMapDeepAnalysis() {
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({ error: "Analysis failed" }));
-          setAnalysis(err.error ?? "Analysis failed");
+          setRunError(err.error ?? "Analysis failed");
           return;
         }
 
@@ -64,18 +81,42 @@ export function useMapDeepAnalysis() {
           const { done, value } = await reader.read();
           if (done) break;
           text += decoder.decode(value, { stream: true });
-          setRawOutput(text);
+          const { clean, status } = stripDeepStreamMarkers(text);
+          setRawOutput(clean);
+          if (status) setRunStatus(formatDeepStatus(status));
         }
 
-        const parsed = parseMapDeepAnalysis(text);
+        const { clean } = stripDeepStreamMarkers(text);
+
+        // If the server wrote an inline error (stream started as 200 but threw
+        // mid-stream), surface it as a proper error rather than analysis text.
+        const inlineError = clean.match(/\n\nError: ([\s\S]+)/);
+        if (inlineError) {
+          setRunError(inlineError[1].trim());
+          return;
+        }
+
+        // If the stream completed with no text at all, something went wrong
+        // server-side but the error didn't make it into the stream.
+        if (!clean.trim()) {
+          setRunError(
+            "No output received from the model. This usually means the API request failed silently. " +
+            "Check the black server console window for error details, then try again. " +
+            "If you see a model access error, your API key may not have access to Fable 5 yet."
+          );
+          return;
+        }
+
+        const parsed = parseMapDeepAnalysis(clean);
         setAnalysis(parsed.analysis);
         setHealth(parsed.health);
         setSuggestions(parsed.suggestions);
         await onComplete?.();
       } catch (e) {
-        setAnalysis(e instanceof Error ? e.message : "Analysis failed");
+        setRunError(e instanceof Error ? e.message : "Analysis failed");
       } finally {
         setRunning(false);
+        setRunStatus(null);
       }
     },
     []
@@ -131,6 +172,8 @@ export function useMapDeepAnalysis() {
   return {
     running,
     rawOutput,
+    runStatus,
+    runError,
     analysis,
     health,
     suggestions,

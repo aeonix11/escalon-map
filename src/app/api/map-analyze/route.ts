@@ -14,13 +14,16 @@ import {
   type DeepModelChoice,
   type DeepAnalysisMode,
 } from "@/lib/anthropic";
+import { DEEP_STATUS_MARKER } from "@/lib/deepAnalysisStream";
 import {
   parseMapDeepAnalysis,
   verifySuggestionSources,
   type SearchResultLogEntry,
 } from "@/lib/mapAnalysis";
 import { saveDeepAnalysisRun } from "@/lib/deepAnalysisHistory";
+import { resolvePromptTemplate } from "@/lib/deepAnalysisPrompts";
 import { serializeMapContext } from "@/lib/mapSerialize";
+import { readSettings } from "@/lib/settings";
 import {
   persistIfEditable,
   resolveMapContext,
@@ -96,11 +99,19 @@ export async function POST(req: NextRequest) {
   );
 
   const searchLog: SearchResultLogEntry[] = [];
+  const settings = readSettings();
+  const promptTemplate = resolvePromptTemplate(
+    mode,
+    mode === "deep"
+      ? settings.deepAnalysisDeepPrompt
+      : settings.deepAnalysisQuickPrompt
+  );
   const analysisOptions: DeepAnalysisOptions = {
     mode,
     model: mode === "deep" ? model : undefined,
     maxSearches: mode === "deep" ? maxSearches : undefined,
     searchLog,
+    promptTemplate,
   };
 
   const stream = new TransformStream();
@@ -125,7 +136,9 @@ export async function POST(req: NextRequest) {
         await writer.write(encoder.encode(chunk));
       }
 
-      const parsed = parseMapDeepAnalysis(fullText);
+      console.log(`[map-analyze] stream done, fullText length=${fullText.length}, mode=${mode}, model=${model}`);
+
+      const parsed = parseMapDeepAnalysis(fullText.replace(DEEP_STATUS_MARKER, ""));
       let suggestions = parsed.suggestions;
       if (mode === "deep" && searchLog.length > 0) {
         suggestions = verifySuggestionSources(suggestions, searchLog);
@@ -176,9 +189,13 @@ export async function POST(req: NextRequest) {
           parsed.health.length > 0
             ? ` Found ${parsed.health.length} map health issue(s).`
             : "";
+        const searchNote =
+          mode === "deep"
+            ? ` Web search: ${searchLog.length} source URL(s) collected (limit ${maxSearches}).`
+            : "";
         await writer.write(
           encoder.encode(
-            `\n\n---\nParsed ${suggestions.length} timeline suggestion(s).${healthNote}${
+            `\n\n---\nParsed ${suggestions.length} timeline suggestion(s).${healthNote}${searchNote}${
               ctx.editable
                 ? " They are now on your timeline as AI-suggested boxes."
                 : ""
@@ -188,6 +205,7 @@ export async function POST(req: NextRequest) {
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Deep analysis failed";
+      console.error("[map-analyze] stream error:", msg);
       await writer.write(encoder.encode(`\n\nError: ${msg}`));
     } finally {
       await writer.close();

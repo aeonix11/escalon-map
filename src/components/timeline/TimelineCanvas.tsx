@@ -227,15 +227,25 @@ export default function TimelineCanvas() {
         {Array.from(
           { length: TIMELINE_END_YEAR - TIMELINE_START_YEAR + 1 },
           (_, i) => TIMELINE_START_YEAR + i
-        ).map((year) => (
+        ).map((year) => {
+          const isDecade = year % 10 === 0;
+          const isHalfDecade = year % 5 === 0;
+          return (
           <div
             key={year}
-            className="pointer-events-none absolute inset-y-0 w-px bg-slate-300/35"
+            className={`pointer-events-none absolute inset-y-0 ${
+              isDecade
+                ? "w-0.5 bg-slate-400/70"
+                : isHalfDecade
+                  ? "w-px bg-slate-400/40"
+                  : "w-px bg-slate-300/25"
+            }`}
             style={{
               left: `${(year - TIMELINE_START_YEAR) * baseWidthPerYear}px`,
             }}
           />
-        ))}
+          );
+        })}
 
         <NowMarker baseWidthPerYear={baseWidthPerYear} />
 
@@ -321,7 +331,7 @@ export default function TimelineCanvas() {
         })}
 
         <div
-          className="absolute top-[50%] translate-y-[-50%] w-full h-16 bg-white/75 border-y border-slate-200 shadow-sm z-10 pointer-events-none"
+          className="absolute top-[50%] translate-y-[-50%] w-full h-20 bg-white/95 border-y-2 border-slate-300 shadow-md z-10 pointer-events-none"
         >
           <CentralTimeAxis
             scale={zoomLevel}

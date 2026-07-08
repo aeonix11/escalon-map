@@ -17,6 +17,7 @@ import {
   ParsedSuggestionCard,
   StoredSuggestionCard,
 } from "@/components/ai-feed/deepAnalysisUi";
+import DeepAnalysisSettingsModal from "@/components/ai-feed/DeepAnalysisSettingsModal";
 
 interface MapIntelligencePanelProps {
   onRefresh?: () => void | Promise<void>;
@@ -47,12 +48,7 @@ export default function MapIntelligencePanel({
   const [model, setModel] = useState<DeepModelChoice>("sonnet-4-6");
   const [maxSearches, setMaxSearches] = useState(5);
   const [scopeNarrativeId, setScopeNarrativeId] = useState<string>("");
-
-  useEffect(() => {
-    if (analysisMode === "deep") {
-      setMaxSearches(defaultMaxSearches(model));
-    }
-  }, [model, analysisMode]);
+  const [promptSettingsOpen, setPromptSettingsOpen] = useState(false);
 
   const panelSuggestions =
     milestoneSuggestions.length > 0 ? milestoneSuggestions : deep.suggestions;
@@ -144,6 +140,7 @@ export default function MapIntelligencePanel({
       : history.selectedRun?.health ?? [];
 
   return (
+    <>
     <aside className="w-[28rem] border-l border-slate-200 bg-white flex flex-col shadow-sm">
       <div className="flex items-center justify-between border-b border-slate-200 p-3">
         <div>
@@ -155,6 +152,16 @@ export default function MapIntelligencePanel({
           )}
         </div>
         <div className="flex gap-2">
+          {tab === "deep" && (
+            <button
+              type="button"
+              onClick={() => setPromptSettingsOpen(true)}
+              title="Edit deep analysis prompts"
+              className="text-[10px] text-violet-600 hover:text-violet-800"
+            >
+              Prompt settings
+            </button>
+          )}
           <button
             onClick={() => {
               clearChat();
@@ -236,7 +243,10 @@ export default function MapIntelligencePanel({
                     Quick
                   </button>
                   <button
-                    onClick={() => setAnalysisMode("deep")}
+                    onClick={() => {
+                      setAnalysisMode("deep");
+                      setMaxSearches(defaultMaxSearches(model));
+                    }}
                     className={`flex-1 rounded px-2 py-1 text-[10px] ${
                       analysisMode === "deep"
                         ? "bg-violet-600 text-white"
@@ -347,17 +357,39 @@ export default function MapIntelligencePanel({
               </div>
 
               <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                {deep.running && (
+                  <div className="rounded border border-violet-200 bg-violet-50/80 p-2 text-xs text-violet-900">
+                    <p className="font-medium">
+                      {deep.runStatus ?? "Running deep research…"}
+                    </p>
+                    {analysisMode === "deep" && model === "fable-5" && !deep.rawOutput && (
+                      <p className="mt-1 text-[10px] text-violet-700">
+                        Fable 5 reasons deeply before writing — first output can
+                        take several minutes. Web searches run during this phase.
+                      </p>
+                    )}
+                  </div>
+                )}
                 {deep.running && deep.rawOutput && (
                   <pre className="whitespace-pre-wrap rounded border border-violet-100 bg-violet-50 p-2 text-xs text-violet-900">
                     {deep.rawOutput}
                   </pre>
                 )}
-                {!deep.running && deep.analysis && (
+                {!deep.running && deep.runError && (
+                  <div className="rounded border border-red-300 bg-red-50 p-3 text-xs">
+                    <p className="font-semibold text-red-800 mb-1">Analysis failed</p>
+                    <p className="text-red-700 whitespace-pre-wrap break-all">{deep.runError}</p>
+                    <p className="mt-2 text-[10px] text-red-600">
+                      Check the server console (the black window) for more detail.
+                    </p>
+                  </div>
+                )}
+                {!deep.running && !deep.runError && deep.analysis && (
                   <div className="rounded border border-violet-100 bg-violet-50 p-3 text-xs text-violet-900 whitespace-pre-wrap">
                     {deep.analysis}
                   </div>
                 )}
-                {!deep.running && !deep.analysis && (
+                {!deep.running && !deep.runError && !deep.analysis && (
                   <p className="text-xs text-slate-500">
                     Run analysis to get a research report, map health audit (deep
                     mode), and timeline suggestions.
@@ -594,5 +626,11 @@ export default function MapIntelligencePanel({
         </>
       )}
     </aside>
+    <DeepAnalysisSettingsModal
+      open={promptSettingsOpen}
+      onClose={() => setPromptSettingsOpen(false)}
+      initialMode={analysisMode}
+    />
+    </>
   );
 }

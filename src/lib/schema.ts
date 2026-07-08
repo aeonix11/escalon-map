@@ -42,6 +42,7 @@ export const milestones = sqliteTable("milestones", {
   isFuzzy: integer("is_fuzzy", { mode: "boolean" }).notNull().default(false),
   fuzzyRangeMonths: integer("fuzzy_range_months").notNull().default(3),
   isPersonal: integer("is_personal", { mode: "boolean" }).notNull().default(false),
+  isSpeculative: integer("is_speculative", { mode: "boolean" }).notNull().default(false),
   hemisphere: text("hemisphere").$type<HemisphereType>().notNull(),
   linkedFragmentId: text("linked_fragment_id").references(() => fragments.id, {
     onDelete: "set null",

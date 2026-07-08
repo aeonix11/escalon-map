@@ -17,9 +17,22 @@ const MONTHS = [
 type Tick = {
   left: number;
   label: string;
-  sub?: string;
-  kind: "year" | "month";
+  kind: "year" | "month" | "decade";
 };
+
+function isDecadeYear(year: number): boolean {
+  return year % 10 === 0;
+}
+
+function shouldShowYear(year: number, scale: ZoomLevel): boolean {
+  if (scale === "DECADAL") return year % 5 === 0;
+  return true;
+}
+
+function monthStep(scale: ZoomLevel): number {
+  if (scale === "SEASONAL") return 3;
+  return 12;
+}
 
 export default function CentralTimeAxis({
   scale,
@@ -29,12 +42,20 @@ export default function CentralTimeAxis({
   const ticks: Tick[] = [];
 
   for (let year = TIMELINE_START_YEAR; year <= TIMELINE_END_YEAR; year++) {
-    const yearLeft = (year - TIMELINE_START_YEAR) * baseWidthPerYear;
+    if (!shouldShowYear(year, scale)) continue;
 
-    ticks.push({ left: yearLeft, label: String(year), kind: "year" });
+    const yearLeft = (year - TIMELINE_START_YEAR) * baseWidthPerYear;
+    const decade = isDecadeYear(year);
+
+    ticks.push({
+      left: yearLeft,
+      label: String(year),
+      kind: decade ? "decade" : "year",
+    });
 
     if (scale === "SEASONAL") {
-      for (let month = 1; month < 12; month++) {
+      const step = monthStep(scale);
+      for (let month = step; month < 12; month += step) {
         const monthLeft =
           (year - TIMELINE_START_YEAR + month / 12) * baseWidthPerYear;
         ticks.push({
@@ -52,32 +73,35 @@ export default function CentralTimeAxis({
         {ticks.map((tick, i) => (
           <div
             key={`${tick.kind}-${tick.left}-${i}`}
-            className="absolute flex flex-col items-center -translate-x-1/2"
+            className="absolute flex flex-col items-center -translate-x-1/2 z-[2]"
             style={{ left: `${tick.left}px` }}
           >
             <div
               className={
-                tick.kind === "year"
-                  ? "h-5 w-0.5 bg-slate-500"
-                  : "h-2.5 w-px bg-slate-300"
+                tick.kind === "decade"
+                  ? "h-6 w-1 rounded-full bg-slate-700"
+                  : tick.kind === "year"
+                    ? "h-4 w-0.5 bg-slate-500"
+                    : "h-2 w-px bg-slate-400"
               }
             />
-            <span
-              className={
-                tick.kind === "year"
-                  ? "mt-1 text-[11px] font-bold tabular-nums text-slate-800"
-                  : "mt-0.5 text-[9px] text-slate-500"
-              }
-            >
-              {tick.label}
-            </span>
-            {tick.sub && (
-              <span className="text-[8px] font-medium text-slate-500">{tick.sub}</span>
+            {tick.kind === "decade" ? (
+              <span className="mt-1 rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[12px] font-bold tabular-nums text-slate-900 shadow-sm">
+                {tick.label}
+              </span>
+            ) : tick.kind === "year" ? (
+              <span className="mt-1 rounded border border-slate-200 bg-white/95 px-1.5 py-px text-[11px] font-semibold tabular-nums text-slate-800 shadow-sm">
+                {tick.label}
+              </span>
+            ) : (
+              <span className="mt-0.5 rounded bg-slate-100/90 px-1 text-[9px] font-medium tabular-nums text-slate-600">
+                {tick.label}
+              </span>
             )}
           </div>
         ))}
       </div>
-      <div className="absolute left-0 right-0 top-1/2 h-px bg-slate-400" />
+      <div className="absolute left-0 right-0 top-1/2 h-0.5 bg-slate-500/80 z-[1]" />
     </div>
   );
 }

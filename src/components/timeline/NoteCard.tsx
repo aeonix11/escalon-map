@@ -26,7 +26,7 @@ export default function NoteCard({ data, zoomLevel, onClick }: NoteCardProps) {
         className="absolute left-0 top-0 h-1 w-full rounded-t-lg"
         style={{ backgroundColor: color }}
       />
-      <p className={`text-slate-500 ${isDecadal ? "text-[9px]" : "text-[10px]"}`}>
+      <p className={`font-semibold tabular-nums text-slate-700 ${isDecadal ? "text-[10px]" : "text-[11px]"}`}>
         {data.pinnedDate}
         {data.isPersonal && (
           <span className="ml-1 rounded bg-violet-100 px-1 text-violet-700">

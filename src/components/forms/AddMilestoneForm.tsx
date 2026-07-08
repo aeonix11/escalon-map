@@ -35,6 +35,7 @@ export default function AddMilestoneForm({
   const [isFuzzy, setIsFuzzy] = useState(false);
   const [fuzzyRangeMonths, setFuzzyRangeMonths] = useState(3);
   const [isPersonal, setIsPersonal] = useState(false);
+  const [isSpeculative, setIsSpeculative] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -59,6 +60,7 @@ export default function AddMilestoneForm({
           isFuzzy,
           fuzzyRangeMonths,
           isPersonal,
+          isSpeculative,
         },
       }),
     });
@@ -162,6 +164,14 @@ export default function AddMilestoneForm({
       <label className="flex items-center gap-2 text-xs text-slate-600 mb-2">
         <input type="checkbox" checked={isFuzzy} onChange={(e) => setIsFuzzy(e.target.checked)} />
         Fuzzy window — extends forward from target date
+      </label>
+      <label className="flex items-center gap-2 text-xs text-slate-600 mb-2">
+        <input
+          type="checkbox"
+          checked={isSpeculative}
+          onChange={(e) => setIsSpeculative(e.target.checked)}
+        />
+        Speculative — anticipated placeholder, timing or certainty not firm
       </label>
       {isFuzzy && (
         <>

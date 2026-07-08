@@ -56,6 +56,7 @@ const CREATE_TABLES_SQL = `
     is_fuzzy INTEGER NOT NULL DEFAULT 0,
     fuzzy_range_months INTEGER NOT NULL DEFAULT 3,
     is_personal INTEGER NOT NULL DEFAULT 0,
+    is_speculative INTEGER NOT NULL DEFAULT 0,
     hemisphere TEXT NOT NULL,
     linked_fragment_id TEXT REFERENCES fragments(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL
@@ -180,6 +181,21 @@ function runMigrations(sqlite: SqlJsDatabase) {
     try {
       sqlite.exec(
         "ALTER TABLE milestones ADD COLUMN is_personal INTEGER NOT NULL DEFAULT 0"
+      );
+    } catch {
+      // column may already exist
+    }
+  }
+
+  const milestoneColumnsAfter = sqlite.exec("PRAGMA table_info(milestones)");
+  const milestoneColNamesAfter =
+    milestoneColumnsAfter.length > 0
+      ? milestoneColumnsAfter[0].values.map((row) => row[1] as string)
+      : [];
+  if (!milestoneColNamesAfter.includes("is_speculative")) {
+    try {
+      sqlite.exec(
+        "ALTER TABLE milestones ADD COLUMN is_speculative INTEGER NOT NULL DEFAULT 0"
       );
     } catch {
       // column may already exist

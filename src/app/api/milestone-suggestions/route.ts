@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
       isFuzzy: suggestion.isFuzzy,
       fuzzyRangeMonths: suggestion.fuzzyRangeMonths,
       isPersonal: false,
+      isSpeculative: suggestion.tier === "speculative",
       hemisphere: suggestion.hemisphere,
       linkedFragmentId: null,
       createdAt: new Date().toISOString(),

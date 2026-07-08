@@ -22,7 +22,7 @@ export function serializeMapContext(
   }
   text += "\n=== MILESTONES ===\n";
   for (const m of allMilestones) {
-    text += `[${m.id}] ${m.targetDate} | ${m.hemisphere} | ${m.title}: ${m.description ?? ""} (narrative: ${m.narrativeId ?? "none"})\n`;
+    text += `[${m.id}] ${m.targetDate} | ${m.hemisphere} | ${m.title}: ${m.description ?? ""} (narrative: ${m.narrativeId ?? "none"}${m.isSpeculative ? ", speculative" : ""})\n`;
   }
   text += "\n=== NOTES ===\n";
   if (allNotes.length === 0) {

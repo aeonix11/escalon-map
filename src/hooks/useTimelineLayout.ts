@@ -25,6 +25,7 @@ function suggestionToLayoutItem(s: MilestoneSuggestion): Milestone & {
     isFuzzy: s.isFuzzy,
     fuzzyRangeMonths: s.fuzzyRangeMonths,
     isPersonal: false,
+    isSpeculative: s.tier === "speculative",
     hemisphere: s.hemisphere,
     linkedFragmentId: null,
     createdAt: s.createdAt,

@@ -83,6 +83,7 @@ export function loadExportIntoSqlite(sqlite: SqlJsDatabase, data: ExportData) {
     is_fuzzy: m.isFuzzy ? 1 : 0,
     fuzzy_range_months: m.fuzzyRangeMonths,
     is_personal: m.isPersonal ? 1 : 0,
+    is_speculative: m.isSpeculative ? 1 : 0,
     hemisphere: m.hemisphere,
     linked_fragment_id: m.linkedFragmentId,
     created_at: m.createdAt,

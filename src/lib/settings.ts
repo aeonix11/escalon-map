@@ -5,12 +5,16 @@ export interface AppSettings {
   activeMapId: string;
   anthropicApiKey: string;
   voyageApiKey: string;
+  deepAnalysisQuickPrompt: string;
+  deepAnalysisDeepPrompt: string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
   activeMapId: MY_MAP_ID,
   anthropicApiKey: "",
   voyageApiKey: "",
+  deepAnalysisQuickPrompt: "",
+  deepAnalysisDeepPrompt: "",
 };
 
 function readEnvFallback(): Partial<AppSettings> {
@@ -54,6 +58,14 @@ export function writeSettings(partial: Partial<AppSettings>): AppSettings {
         : current.anthropicApiKey,
     voyageApiKey:
       partial.voyageApiKey !== undefined ? partial.voyageApiKey : current.voyageApiKey,
+    deepAnalysisQuickPrompt:
+      partial.deepAnalysisQuickPrompt !== undefined
+        ? partial.deepAnalysisQuickPrompt
+        : current.deepAnalysisQuickPrompt,
+    deepAnalysisDeepPrompt:
+      partial.deepAnalysisDeepPrompt !== undefined
+        ? partial.deepAnalysisDeepPrompt
+        : current.deepAnalysisDeepPrompt,
   };
   return persistSettings(next);
 }

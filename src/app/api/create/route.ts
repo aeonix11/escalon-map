@@ -81,6 +81,7 @@ export async function POST(req: NextRequest) {
         isFuzzy: data.isFuzzy ?? false,
         fuzzyRangeMonths: data.fuzzyRangeMonths ?? 3,
         isPersonal: data.isPersonal ?? false,
+        isSpeculative: data.isSpeculative ?? false,
         hemisphere,
         linkedFragmentId: data.linkedFragmentId ?? null,
         createdAt: nowIso(),
