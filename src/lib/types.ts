@@ -1,4 +1,4 @@
-import type { MilestoneWithNarratives, Narrative, Fragment, Note, MilestoneSuggestion } from "@/lib/schema";
+import type { MilestoneWithNarratives, Narrative, Fragment, Note, MilestoneSuggestion, Milestone } from "@/lib/schema";
 
 export const TIMELINE_START_YEAR = 2012;
 export const TIMELINE_END_YEAR = 2075;

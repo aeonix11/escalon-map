@@ -1,6 +1,6 @@
 import type { MapHealthIssue, MapMilestoneSuggestion } from "@/lib/mapAnalysis";
 import { parseStoredSources } from "@/lib/mapAnalysis";
-import type { MilestoneWithNarratives, MilestoneSuggestion, SuggestionTier } from "@/lib/schema";
+import type { MilestoneWithNarratives, MilestoneSuggestion, SuggestionTier, Milestone } from "@/lib/schema";
 import type { DeepModelChoice } from "@/lib/anthropic";
 import { serializeMapContext } from "@/lib/mapSerialize";
 import type { Fragment, Narrative, Note } from "@/lib/schema";
