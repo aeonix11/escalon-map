@@ -58,6 +58,41 @@ export default function SettingsPage() {
     loadSettings();
   }, []);
 
+  const saveApiKeys = async () => {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const payload: Record<string, string> = {};
+      if (anthropicKey.trim()) payload.anthropicApiKey = anthropicKey.trim();
+      if (voyageKey.trim()) payload.voyageApiKey = voyageKey.trim();
+      if (Object.keys(payload).length === 0) {
+        setMessage("Enter at least one API key to save.");
+        setSaving(false);
+        return;
+      }
+
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setMessage(err.error ?? "Could not save API keys.");
+        return;
+      }
+      const data = (await res.json()) as SettingsResponse;
+      setSettings(data);
+      setAnthropicKey("");
+      setVoyageKey("");
+      setMessage("API keys saved.");
+    } catch {
+      setMessage("Could not save API keys.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const saveSettings = async (extra: Record<string, unknown> = {}) => {
     setSaving(true);
     setMessage(null);
@@ -342,20 +377,26 @@ export default function SettingsPage() {
         <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold">AI features (optional)</h2>
           <p className="mt-1 text-xs text-slate-600">
-            Set keys here or via environment variables on your host (Vercel).
+            Your keys are stored encrypted in your account. AI usage is billed to
+            your Anthropic and Voyage accounts — not the app host.
           </p>
           <div className="mt-4 space-y-3">
             <label className="block text-xs text-slate-600">
               Anthropic API key
               {settings?.apiKeys.anthropicConfigured && (
                 <span className="ml-2 text-emerald-600">
-                  configured {settings.apiKeys.anthropicMasked}
+                  saved {settings.apiKeys.anthropicMasked}
                 </span>
               )}
               <input
                 type="password"
                 value={anthropicKey}
                 onChange={(e) => setAnthropicKey(e.target.value)}
+                placeholder={
+                  settings?.apiKeys.anthropicConfigured
+                    ? "Enter new key to replace, or leave blank"
+                    : "sk-ant-…"
+                }
                 className={`${inputClass} mt-1`}
               />
             </label>
@@ -363,24 +404,60 @@ export default function SettingsPage() {
               Voyage API key
               {settings?.apiKeys.voyageConfigured && (
                 <span className="ml-2 text-emerald-600">
-                  configured {settings.apiKeys.voyageMasked}
+                  saved {settings.apiKeys.voyageMasked}
                 </span>
               )}
               <input
                 type="password"
                 value={voyageKey}
                 onChange={(e) => setVoyageKey(e.target.value)}
+                placeholder={
+                  settings?.apiKeys.voyageConfigured
+                    ? "Enter new key to replace, or leave blank"
+                    : "pa-…"
+                }
                 className={`${inputClass} mt-1`}
               />
             </label>
           </div>
-          <button
-            onClick={() => saveSettings()}
-            disabled={saving}
-            className="mt-4 rounded bg-violet-600 px-4 py-2 text-xs text-white hover:bg-violet-500 disabled:opacity-50"
-          >
-            Save API keys
-          </button>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              onClick={() => saveApiKeys()}
+              disabled={saving}
+              className="rounded bg-violet-600 px-4 py-2 text-xs text-white hover:bg-violet-500 disabled:opacity-50"
+            >
+              Save API keys
+            </button>
+            {(settings?.apiKeys.anthropicConfigured ||
+              settings?.apiKeys.voyageConfigured) && (
+              <button
+                onClick={() => {
+                  setAnthropicKey("");
+                  setVoyageKey("");
+                  void fetch("/api/settings", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      anthropicApiKey: "",
+                      voyageApiKey: "",
+                    }),
+                  }).then(async (res) => {
+                    if (res.ok) {
+                      const data = (await res.json()) as SettingsResponse;
+                      setSettings(data);
+                      setMessage("API keys removed.");
+                    } else {
+                      setMessage("Could not remove API keys.");
+                    }
+                  });
+                }}
+                disabled={saving}
+                className="rounded border border-slate-300 px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Clear saved keys
+              </button>
+            )}
+          </div>
         </section>
 
         <section className="rounded-lg border border-red-100 bg-white p-5 shadow-sm">

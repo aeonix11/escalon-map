@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import type { SearchResultLogEntry } from "@/lib/mapAnalysis";
 import {
@@ -5,7 +6,7 @@ import {
   resolvePromptTemplate,
 } from "@/lib/deepAnalysisPrompts";
 
-/** Override with ANTHROPIC_MODEL in Settings / env if needed (e.g. claude-sonnet-5). */
+/** Override with ANTHROPIC_MODEL in env if needed (e.g. claude-sonnet-5). */
 const DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6";
 
 export type DeepModelChoice = "sonnet-4-6" | "sonnet-5" | "fable-5";
@@ -23,6 +24,19 @@ export interface DeepAnalysisOptions {
   maxSearches?: number;
   searchLog?: SearchResultLogEntry[];
   promptTemplate?: string;
+  apiKey: string;
+}
+
+const clientCache = new Map<string, Anthropic>();
+
+function createAnthropicClient(apiKey: string): Anthropic {
+  const cacheKey = createHash("sha256").update(apiKey).digest("hex");
+  let client = clientCache.get(cacheKey);
+  if (!client) {
+    client = new Anthropic({ apiKey });
+    clientCache.set(cacheKey, client);
+  }
+  return client;
 }
 
 function getClaudeModel(): string {
@@ -70,9 +84,6 @@ function modelUsesModernWebSearch(modelId: string): boolean {
 
 function buildWebSearchTool(modelId: string, maxSearches: number): Record<string, unknown> {
   if (modelUsesModernWebSearch(modelId)) {
-    // web_search_20260209 defaults to dynamic filtering via code execution.
-    // allowed_callers: ["direct"] forces direct calls (same behaviour as the
-    // older 20250305 variant) and avoids the secondary code-execution layer.
     return {
       type: "web_search_20260209",
       name: "web_search",
@@ -88,8 +99,6 @@ function buildWebSearchTool(modelId: string, maxSearches: number): Record<string
 }
 
 function deepMaxTokens(modelId: string): number {
-  // Fable 5 adaptive thinking can consume many tokens before producing text.
-  // Use a generous budget (near the 128k limit) so thinking doesn't crowd out output.
   if (modelId === "claude-fable-5") return 131072;
   if (modelId === "claude-sonnet-5") return 32768;
   return 16384;
@@ -97,9 +106,6 @@ function deepMaxTokens(modelId: string): number {
 
 function deepThinkingParams(modelId: string): Record<string, unknown> {
   if (modelUsesAdaptiveThinking(modelId)) {
-    // Fable 5: adaptive thinking is always on; specifying "adaptive" is optional
-    // but harmless. Use "high" effort — "xhigh" can exhaust max_tokens on
-    // thinking alone and leave no room for text output.
     return {
       output_config: { effort: "high" },
     };
@@ -107,17 +113,6 @@ function deepThinkingParams(modelId: string): Record<string, unknown> {
   return {
     thinking: { type: "enabled", budget_tokens: 4096 },
   };
-}
-
-let client: Anthropic | null = null;
-
-function getClient() {
-  if (!client) {
-    client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY ?? "",
-    });
-  }
-  return client;
 }
 
 export interface NarrativeCandidate {
@@ -133,19 +128,20 @@ export interface MatchResult {
 }
 
 export async function reasonMatch(
+  apiKey: string,
   signalTitle: string,
   signalSummary: string | null,
   candidates: NarrativeCandidate[]
 ): Promise<MatchResult> {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!apiKey) {
     return {
       matched: false,
       narrativeId: candidates[0]?.id ?? null,
-      reasoning: "ANTHROPIC_API_KEY not configured.",
+      reasoning: "Anthropic API key not configured.",
     };
   }
 
-  const anthropic = getClient();
+  const anthropic = createAnthropicClient(apiKey);
   const candidateList = candidates
     .map(
       (c) =>
@@ -199,11 +195,11 @@ Respond in JSON only:
 export async function streamMapDeepAnalysis(
   mapContext: string,
   narratives: NarrativeCandidate[],
-  options: DeepAnalysisOptions = {}
+  options: DeepAnalysisOptions
 ): Promise<AsyncIterable<string>> {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!options.apiKey) {
     return (async function* () {
-      yield "ANTHROPIC_API_KEY not configured. Add your key in Settings to run deep analysis.";
+      yield "Add your Anthropic API key in Settings to run deep analysis.";
     })();
   }
 
@@ -221,7 +217,7 @@ export async function streamMapDeepAnalysis(
     narrativeList
   );
 
-  const anthropic = getClient();
+  const anthropic = createAnthropicClient(options.apiKey);
   const modelId =
     mode === "deep"
       ? DEEP_MODEL_IDS[options.model ?? "sonnet-4-6"]
@@ -286,10 +282,11 @@ export async function streamMapDeepAnalysis(
 }
 
 export async function streamMapChat(
+  apiKey: string,
   systemPrompt: string,
   userMessage: string
 ): Promise<AsyncIterable<string>> {
-  const anthropic = getClient();
+  const anthropic = createAnthropicClient(apiKey);
   const stream = await anthropic.messages.stream({
     model: getClaudeModel(),
     max_tokens: 4096,
@@ -330,13 +327,14 @@ export interface ScanResultItem {
 }
 
 export async function streamSignalScan(
+  apiKey: string,
   narratives: NarrativeCandidate[],
   milestones: ScanMilestoneInput[],
   signals: ScanSignalInput[]
 ): Promise<AsyncIterable<string>> {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!apiKey) {
     return (async function* () {
-      yield "ANTHROPIC_API_KEY not configured. Cannot scan signals.";
+      yield "Add your Anthropic API key in Settings to scan signals.";
     })();
   }
 
@@ -361,7 +359,7 @@ export async function streamSignalScan(
     )
     .join("\n");
 
-  const anthropic = getClient();
+  const anthropic = createAnthropicClient(apiKey);
   const stream = await anthropic.messages.stream({
     model: getClaudeModel(),
     max_tokens: 4096,

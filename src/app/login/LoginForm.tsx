@@ -45,8 +45,23 @@ export default function LoginForm() {
       <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
         <h1 className="text-2xl font-semibold text-slate-900">Escalon Map</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Sign in to view and edit your timeline map.
+          Sign in to create and edit your own timeline map.
         </p>
+
+        <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50 px-3 py-3 text-xs text-slate-600 space-y-2">
+          <p>
+            <span className="font-medium text-slate-700">Viewing a shared map?</span>{" "}
+            Open the link you were sent — no account needed.
+          </p>
+          <p>
+            <span className="font-medium text-slate-700">Want to comment?</span>{" "}
+            Just pick a display name when you post. No email or password required.
+          </p>
+          <p>
+            <span className="font-medium text-slate-700">Magic link not working?</span>{" "}
+            Try <span className="font-medium">Continue with Google</span> instead, or check your spam folder.
+          </p>
+        </div>
 
         <form onSubmit={handleMagicLink} className="mt-6 space-y-4">
           <div>

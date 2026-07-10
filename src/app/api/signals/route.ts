@@ -5,6 +5,7 @@ import { embedText, embeddingToBuffer } from "@/lib/voyage";
 import { nowIso } from "@/lib/types";
 import { readOnlyResponse, resolveOwnerMapContext } from "@/lib/mapContext";
 import { setMilestoneNarratives } from "@/lib/mapData";
+import { loadUserApiKeys } from "@/lib/userApiKeys";
 
 export async function GET() {
   const ctx = await resolveOwnerMapContext();
@@ -19,13 +20,15 @@ export async function POST(req: NextRequest) {
   const ctx = await resolveOwnerMapContext();
   if (!ctx.editable) return readOnlyResponse();
 
+  const keys = await loadUserApiKeys(ctx.userId!);
   const db = ctx.db;
   const body = await req.json();
 
   if (body.action === "create") {
     const id = crypto.randomUUID();
     const embedding = await embedText(
-      `${body.title}\n${body.summary ?? ""}`
+      `${body.title}\n${body.summary ?? ""}`,
+      keys.voyageApiKey
     );
     await db.insert(aiNewsSignals).values({
       id,

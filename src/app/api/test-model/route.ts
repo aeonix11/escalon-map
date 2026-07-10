@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { requireSessionUser } from "@/lib/auth";
+import {
+  loadUserApiKeys,
+  missingAnthropicKeyResponse,
+} from "@/lib/userApiKeys";
 
 export async function GET(req: NextRequest) {
+  const user = await requireSessionUser();
+  const keys = await loadUserApiKeys(user.id);
   const model = req.nextUrl.searchParams.get("model") ?? "claude-fable-5";
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ error: "ANTHROPIC_API_KEY not set" }, { status: 500 });
+  if (!keys.anthropicApiKey) {
+    return NextResponse.json(missingAnthropicKeyResponse(), { status: 400 });
   }
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const client = new Anthropic({ apiKey: keys.anthropicApiKey });
 
   try {
     const resp = await client.messages.create({

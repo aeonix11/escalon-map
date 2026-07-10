@@ -91,8 +91,9 @@ Fill in `.env.local`:
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
 | `DATABASE_URL` | Supabase pooled Postgres URI (port 6543) |
 | `NEXT_PUBLIC_SITE_URL` | `http://localhost:3000` for local auth |
-| `ANTHROPIC_API_KEY` | Optional — dev fallback only; prefer per-user keys in Settings |
-| `VOYAGE_API_KEY` | Optional — embeddings / semantic search |
+| `API_KEY_ENCRYPTION_SECRET` | Random hex (`openssl rand -hex 32`) — required to save keys |
+| `ANTHROPIC_API_KEY` | Optional local dev fallback only |
+| `VOYAGE_API_KEY` | Optional local dev fallback only |
 
 Apply the database schema (Supabase SQL editor or):
 
@@ -101,7 +102,7 @@ npm install
 npm run db:push
 ```
 
-Run migrations in order if you use SQL files: `drizzle/0000_init.sql`, then `drizzle/0001_comment_anchors.sql`.
+Run migrations in order if you use SQL files: `drizzle/0000_init.sql`, `drizzle/0001_comment_anchors.sql`, `drizzle/0002_user_api_keys.sql`.
 
 ```bash
 npm run dev
@@ -118,43 +119,24 @@ In Supabase **Authentication → URL configuration**, add:
 
 ## AI API keys (bring your own)
 
-Map Intelligence, signal matching, and deep analysis call **Anthropic** and optionally **Voyage** on your behalf. **You should use your own keys** so usage is billed to you, not the app operator.
+Map Intelligence, signal matching, and deep analysis call **Anthropic** and optionally **Voyage** on your behalf. **Each user saves their own keys** in Settings so usage is billed to them, not the app operator.
 
-### How it works today
+### How it works
 
-| Environment | Where keys live |
-|-------------|-----------------|
-| **Local dev** | Settings page → saved in `data/settings.json` on your machine (not committed to git) |
-| **Hosted (Vercel)** | Settings UI exists, but serverless cannot persist to disk — keys currently fall back to **deployment env vars** if set |
+| What | Where |
+|------|--------|
+| Your API keys (encrypted) | Supabase `profiles` table |
+| Encryption master secret | `API_KEY_ENCRYPTION_SECRET` in Vercel env (operator sets once) |
+| Vercel disk | Not used — read-only on serverless |
 
-That means on the public deployment, if the operator sets `ANTHROPIC_API_KEY` in Vercel, **everyone’s AI requests could share that one key** until per-user storage is implemented.
+1. Open **Settings** and paste your Anthropic / Voyage keys.
+2. Keys are encrypted (AES-256-GCM) before being written to Postgres.
+3. When you run Map Intelligence, the server decrypts **your** keys in memory for that request only.
+4. The API never returns full keys — only masked hints (`sk-a••••xyz`).
 
-### Planned direction: per-user keys in the database
+**Do not** set `ANTHROPIC_API_KEY` or `VOYAGE_API_KEY` in Vercel env on a shared deployment.
 
-The intended model:
-
-1. Each user saves keys in **Settings** (already in the UI).
-2. Keys are stored **encrypted** in Postgres (per-user row), not plaintext.
-3. A server-only **encryption secret** in Vercel env decrypts keys only when that user runs an AI feature.
-4. API routes never return full keys — only masked hints (`sk-a••••xyz`).
-5. No AI calls without a key configured for the logged-in user.
-
-**Is the database hackable?** Any server-stored secret can be exposed if both the DB and encryption key leak. Standard mitigation:
-
-- Encrypt at rest (AES-256-GCM) with a master secret **outside** the database
-- Row-level access: only the owning user’s keys are ever decrypted
-- Never log keys; mask in API responses
-- Optional: Supabase Vault or a dedicated secrets service for the master key
-
-**Alternatives considered**
-
-| Approach | Pros | Cons |
-|----------|------|------|
-| **Encrypted in DB** (recommended) | Works with server-side AI routes; keys sync across devices | Requires trusting the app host with encrypted blobs |
-| **Browser-only storage** | Server never sees keys | CORS limits direct API calls; keys visible in devtools; harder for server-side features |
-| **No hosted AI** | Zero key risk for operator | Users lose Intelligence features on the web app |
-
-Until per-user encrypted storage ships, **do not put your personal Anthropic key in Vercel env vars** if others will use the same deployment.
+Local dev can still use `data/settings.json` or env var fallbacks if you have not saved keys to the database yet.
 
 ---
 
@@ -223,7 +205,7 @@ See git history / tags if you need the pure local-first workflow.
 |---------|-----|
 | Auth redirect error | Check Supabase Site URL includes `https://` and redirect URLs match your domain |
 | Map empty after login | Import your JSON export via Settings, or wait for seed data on first load |
-| AI features disabled | Add your Anthropic key in Settings (per-user DB storage coming soon) |
+| AI features disabled | Add keys in Settings; run `0002_user_api_keys.sql`; set `API_KEY_ENCRYPTION_SECRET` on Vercel |
 | Comments not anchoring | Run `drizzle/0001_comment_anchors.sql` on your database |
 | `DATABASE_URL is not set` | Add Supabase pooled connection string to env vars |
 

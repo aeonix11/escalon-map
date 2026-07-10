@@ -6,10 +6,10 @@ interface VoyageEmbedResponse {
 }
 
 async function callVoyageEmbed(
+  apiKey: string,
   input: string[],
   inputType: "document" | "query"
 ): Promise<Float32Array[]> {
-  const apiKey = process.env.VOYAGE_API_KEY;
   if (!apiKey || input.length === 0) return [];
 
   const response = await fetch(VOYAGE_EMBED_URL, {
@@ -37,21 +37,30 @@ async function callVoyageEmbed(
     .map((d) => new Float32Array(d.embedding!));
 }
 
-export async function embedText(text: string): Promise<Float32Array | null> {
-  if (!process.env.VOYAGE_API_KEY) return null;
-  const embeddings = await callVoyageEmbed([text], "document");
+export async function embedText(
+  text: string,
+  apiKey?: string
+): Promise<Float32Array | null> {
+  if (!apiKey) return null;
+  const embeddings = await callVoyageEmbed(apiKey, [text], "document");
   return embeddings[0] ?? null;
 }
 
-export async function embedQuery(text: string): Promise<Float32Array | null> {
-  if (!process.env.VOYAGE_API_KEY) return null;
-  const embeddings = await callVoyageEmbed([text], "query");
+export async function embedQuery(
+  text: string,
+  apiKey?: string
+): Promise<Float32Array | null> {
+  if (!apiKey) return null;
+  const embeddings = await callVoyageEmbed(apiKey, [text], "query");
   return embeddings[0] ?? null;
 }
 
-export async function embedBatch(texts: string[]): Promise<Float32Array[]> {
-  if (!process.env.VOYAGE_API_KEY || texts.length === 0) return [];
-  return callVoyageEmbed(texts, "document");
+export async function embedBatch(
+  texts: string[],
+  apiKey?: string
+): Promise<Float32Array[]> {
+  if (!apiKey || texts.length === 0) return [];
+  return callVoyageEmbed(apiKey, texts, "document");
 }
 
 export function embeddingToBuffer(embedding: Float32Array): Buffer {

@@ -16,7 +16,8 @@ export interface MapComment {
   id: string;
   body: string;
   createdAt: string;
-  userId: string;
+  userId: string | null;
+  guestId?: string | null;
   authorName: string;
   milestoneId: string | null;
   pinnedDate: string | null;

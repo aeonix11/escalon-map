@@ -5,7 +5,10 @@ Host on **Vercel** + **Supabase** at $0/month for a small audience.
 ## 1. Supabase
 
 1. Create a project at [supabase.com](https://supabase.com) (free tier).
-2. Open **SQL Editor** and run the schema in [`drizzle/0000_init.sql`](drizzle/0000_init.sql).
+2. Open **SQL Editor** and run migrations in order:
+   - [`drizzle/0000_init.sql`](drizzle/0000_init.sql)
+   - [`drizzle/0001_comment_anchors.sql`](drizzle/0001_comment_anchors.sql)
+   - [`drizzle/0002_user_api_keys.sql`](drizzle/0002_user_api_keys.sql)
 3. Under **Project Settings → Database**, copy the **Connection string** (URI, pooler mode).
 4. Under **Project Settings → API**, copy:
    - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
@@ -26,10 +29,11 @@ Host on **Vercel** + **Supabase** at $0/month for a small audience.
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
 | `NEXT_PUBLIC_SITE_URL` | Your Vercel URL |
-| `ANTHROPIC_API_KEY` | Optional, for AI features |
-| `VOYAGE_API_KEY` | Optional, for embeddings |
+| `API_KEY_ENCRYPTION_SECRET` | Random 32-byte hex (`openssl rand -hex 32`) |
 
-3. Deploy. First visit prompts login; a map is auto-created on signup.
+Do **not** set `ANTHROPIC_API_KEY` or `VOYAGE_API_KEY` on Vercel — each user saves their own keys in **Settings**.
+
+3. Deploy. First visit prompts login; a map is auto-created on signup. Users add API keys in Settings for Map Intelligence.
 
 ## 3. Local development
 
@@ -64,10 +68,11 @@ Import **replaces** your cloud map contents.
 
 - **Supabase**: 500 MB DB, 50K MAU — fine for a small group
 - **Vercel Hobby**: sufficient for low traffic; cold starts possible
-- **AI keys**: usage-based if you enable Map Intelligence
+- **AI keys**: each user brings their own in Settings; billed to their Anthropic/Voyage account
 
 ## Troubleshooting
 
 - **DATABASE_URL is not set** — add the pooled connection string to Vercel env vars.
 - **Auth redirect fails** — check Supabase redirect URLs match your domain.
-- **Map empty after signup** — demo seed data loads on first `/api/data` request.
+- **AI features disabled** — add your keys in Settings; ensure `API_KEY_ENCRYPTION_SECRET` is set on Vercel and migration `0002_user_api_keys.sql` has run
+- **Map empty after signup** — demo seed data loads on first `/api/data` request

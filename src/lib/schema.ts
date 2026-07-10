@@ -29,6 +29,8 @@ export const profiles = pgTable("profiles", {
     .$type<"fade" | "hide">()
     .notNull()
     .default("fade"),
+  anthropicApiKeyEnc: text("anthropic_api_key_enc"),
+  voyageApiKeyEnc: text("voyage_api_key_enc"),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
     .notNull()
     .defaultNow(),
@@ -242,9 +244,9 @@ export const comments = pgTable("comments", {
   mapId: text("map_id")
     .notNull()
     .references(() => maps.id, { onDelete: "cascade" }),
-  userId: text("user_id")
-    .notNull()
-    .references(() => profiles.id, { onDelete: "cascade" }),
+  userId: text("user_id").references(() => profiles.id, { onDelete: "cascade" }),
+  guestId: text("guest_id"),
+  guestName: text("guest_name"),
   body: text("body").notNull(),
   milestoneId: text("milestone_id").references(() => milestones.id, {
     onDelete: "set null",

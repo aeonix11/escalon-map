@@ -8,15 +8,20 @@ import {
 } from "@/lib/voyage";
 import { resolveOwnerMapContext } from "@/lib/mapContext";
 import { fetchMapPayload } from "@/lib/mapData";
+import { loadUserApiKeys, missingVoyageKeyResponse } from "@/lib/userApiKeys";
 
 export async function POST(req: NextRequest) {
   const ctx = await resolveOwnerMapContext();
+  const keys = await loadUserApiKeys(ctx.userId!);
   const db = ctx.db;
   const { query, type } = await req.json();
 
-  const queryEmbedding = await embedQuery(query);
+  const queryEmbedding = await embedQuery(query, keys.voyageApiKey);
   if (!queryEmbedding) {
-    return NextResponse.json({ results: [], note: "VOYAGE_API_KEY not set" });
+    if (!keys.voyageApiKey) {
+      return NextResponse.json(missingVoyageKeyResponse(), { status: 400 });
+    }
+    return NextResponse.json({ results: [], note: "Embedding failed" });
   }
 
   if (type === "fragments") {

@@ -8,7 +8,6 @@ import {
   getSessionUser,
   requireSessionUser,
 } from "@/lib/auth";
-import { applySettingsToEnv, readSettings } from "@/lib/settings";
 
 export interface MapContext {
   mapId: string;
@@ -19,7 +18,6 @@ export interface MapContext {
 }
 
 export async function resolveOwnerMapContext(): Promise<MapContext> {
-  applySettingsToEnv(readSettings());
   const user = await requireSessionUser();
   const map = await bootstrapUser(user);
   return {

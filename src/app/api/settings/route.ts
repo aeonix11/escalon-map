@@ -6,10 +6,13 @@ import {
   bootstrapUser,
   requireSessionUser,
 } from "@/lib/auth";
-import { applySettingsToEnv, maskApiKey, readSettings, writeSettings } from "@/lib/settings";
+import {
+  getMaskedUserApiKeys,
+  requireEncryptionSecret,
+  saveUserApiKeys,
+} from "@/lib/userApiKeys";
 
 export async function GET() {
-  applySettingsToEnv(readSettings());
   const user = await requireSessionUser();
   const map = await bootstrapUser(user);
   const db = getDb();
@@ -20,7 +23,7 @@ export async function GET() {
     .where(eq(profiles.id, user.id))
     .limit(1);
 
-  const settings = readSettings();
+  const apiKeys = await getMaskedUserApiKeys(user.id);
 
   return NextResponse.json({
     activeMapId: map.id,
@@ -35,16 +38,7 @@ export async function GET() {
         shareSlug: map.shareSlug,
       },
     ],
-    apiKeys: {
-      anthropicConfigured: Boolean(
-        settings.anthropicApiKey || process.env.ANTHROPIC_API_KEY
-      ),
-      voyageConfigured: Boolean(
-        settings.voyageApiKey || process.env.VOYAGE_API_KEY
-      ),
-      anthropicMasked: maskApiKey(settings.anthropicApiKey),
-      voyageMasked: maskApiKey(settings.voyageApiKey),
-    },
+    apiKeys,
     readOnly: false,
     user: {
       id: user.id,
@@ -60,22 +54,28 @@ export async function PUT(req: NextRequest) {
   const map = await bootstrapUser(user);
   const db = getDb();
   const body = await req.json();
-  const current = readSettings();
 
   if (body.anthropicApiKey !== undefined || body.voyageApiKey !== undefined) {
-    writeSettings({
-      activeMapId: map.id,
-      anthropicApiKey:
-        body.anthropicApiKey !== undefined
-          ? body.anthropicApiKey
-          : current.anthropicApiKey,
-      voyageApiKey:
-        body.voyageApiKey !== undefined
-          ? body.voyageApiKey
-          : current.voyageApiKey,
-      deepAnalysisQuickPrompt: current.deepAnalysisQuickPrompt,
-      deepAnalysisDeepPrompt: current.deepAnalysisDeepPrompt,
-    });
+    try {
+      requireEncryptionSecret();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Encryption not configured";
+      return NextResponse.json({ error: msg }, { status: 500 });
+    }
+
+    try {
+      await saveUserApiKeys(user.id, {
+        ...(body.anthropicApiKey !== undefined
+          ? { anthropicApiKey: body.anthropicApiKey }
+          : {}),
+        ...(body.voyageApiKey !== undefined
+          ? { voyageApiKey: body.voyageApiKey }
+          : {}),
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not save API keys";
+      return NextResponse.json({ error: msg }, { status: 500 });
+    }
   }
 
   const mapUpdates: Partial<{

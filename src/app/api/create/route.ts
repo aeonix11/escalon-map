@@ -12,11 +12,13 @@ import { nowIso } from "@/lib/types";
 import { embedText, embeddingToBuffer } from "@/lib/voyage";
 import { readOnlyResponse, resolveOwnerMapContext } from "@/lib/mapContext";
 import { setMilestoneNarratives } from "@/lib/mapData";
+import { loadUserApiKeys } from "@/lib/userApiKeys";
 
 export async function POST(req: NextRequest) {
   const ctx = await resolveOwnerMapContext();
   if (!ctx.editable) return readOnlyResponse();
 
+  const keys = await loadUserApiKeys(ctx.userId!);
   const db = ctx.db;
   const body = await req.json();
   const { type, data } = body;
@@ -25,7 +27,8 @@ export async function POST(req: NextRequest) {
   if (type === "narrative") {
     const id = crypto.randomUUID();
     const embedding = await embedText(
-      `${data.title}\n${data.description ?? ""}`
+      `${data.title}\n${data.description ?? ""}`,
+      keys.voyageApiKey
     );
     await db.insert(narratives).values({
       id,
@@ -41,7 +44,7 @@ export async function POST(req: NextRequest) {
 
   if (type === "fragment") {
     const id = crypto.randomUUID();
-    const embedding = await embedText(data.rawText);
+    const embedding = await embedText(data.rawText, keys.voyageApiKey);
     await db.insert(fragments).values({
       id,
       mapId,

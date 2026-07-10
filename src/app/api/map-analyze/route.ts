@@ -20,6 +20,10 @@ import { serializeMapContext, milestoneMatchesNarrative } from "@/lib/mapSeriali
 import { readSettings } from "@/lib/settings";
 import { resolveOwnerMapContext } from "@/lib/mapContext";
 import { fetchMapPayload } from "@/lib/mapData";
+import {
+  loadUserApiKeys,
+  missingAnthropicKeyResponse,
+} from "@/lib/userApiKeys";
 
 interface AnalyzeRequestBody {
   mode?: DeepAnalysisMode;
@@ -30,6 +34,10 @@ interface AnalyzeRequestBody {
 
 export async function POST(req: NextRequest) {
   const ctx = await resolveOwnerMapContext();
+  const keys = await loadUserApiKeys(ctx.userId!);
+  if (!keys.anthropicApiKey) {
+    return NextResponse.json(missingAnthropicKeyResponse(), { status: 400 });
+  }
 
   let body: AnalyzeRequestBody = {};
   try {
@@ -96,6 +104,7 @@ export async function POST(req: NextRequest) {
     maxSearches: mode === "deep" ? maxSearches : undefined,
     searchLog,
     promptTemplate,
+    apiKey: keys.anthropicApiKey,
   };
 
   const stream = new TransformStream();

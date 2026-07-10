@@ -9,10 +9,19 @@ import {
   embeddingToBuffer,
 } from "@/lib/voyage";
 import { readOnlyResponse, resolveOwnerMapContext } from "@/lib/mapContext";
+import {
+  loadUserApiKeys,
+  missingAnthropicKeyResponse,
+} from "@/lib/userApiKeys";
 
 export async function POST(req: NextRequest) {
   const ctx = await resolveOwnerMapContext();
   if (!ctx.editable) return readOnlyResponse();
+
+  const keys = await loadUserApiKeys(ctx.userId!);
+  if (!keys.anthropicApiKey) {
+    return NextResponse.json(missingAnthropicKeyResponse(), { status: 400 });
+  }
 
   const db = ctx.db;
   const { signalId } = await req.json();
@@ -37,7 +46,8 @@ export async function POST(req: NextRequest) {
     signalEmbedding = bufferToEmbedding(signal.embedding);
   } else {
     signalEmbedding = await embedText(
-      `${signal.title}\n${signal.summary ?? ""}`
+      `${signal.title}\n${signal.summary ?? ""}`,
+      keys.voyageApiKey
     );
     if (signalEmbedding) {
       await db
@@ -71,6 +81,7 @@ export async function POST(req: NextRequest) {
   }
 
   const result = await reasonMatch(
+    keys.anthropicApiKey,
     signal.title,
     signal.summary,
     candidates.map((c) => ({

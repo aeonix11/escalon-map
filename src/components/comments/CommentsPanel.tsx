@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useMapStore, type MapComment, type CommentAnchorMode } from "@/store/mapStore";
+import GuestNameModal, {
+  loadGuestSession,
+  type GuestSession,
+} from "./GuestNameModal";
 
 interface CommentsPanelProps {
   mode: "owner" | "viewer";
@@ -21,6 +24,9 @@ export default function CommentsPanel({
   const [mapName, setMapName] = useState("");
   const [body, setBody] = useState("");
   const [loggedIn, setLoggedIn] = useState<boolean | null>(mode === "owner" ? true : null);
+  const [guestSession, setGuestSession] = useState<GuestSession | null>(null);
+  const [showGuestModal, setShowGuestModal] = useState(false);
+  const [pendingSubmit, setPendingSubmit] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -58,9 +64,13 @@ export default function CommentsPanel({
   useEffect(() => {
     loadComments();
     if (mode === "viewer") {
+      // Check if user is logged in with a real session
       fetch("/api/settings")
         .then((r) => setLoggedIn(r.ok))
         .catch(() => setLoggedIn(false));
+      // Restore any existing guest session from localStorage
+      const existing = loadGuestSession();
+      if (existing) setGuestSession(existing);
     }
   }, [shareSlug, mapId, mode]);
 
@@ -72,8 +82,7 @@ export default function CommentsPanel({
     }
   }, [focusedCommentId]);
 
-  const postComment = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitComment = async (session: GuestSession | null) => {
     if (!body.trim() || !shareSlug) return;
 
     if (commentAnchorMode === "timeline" && !pendingCommentAnchor?.pinnedDate) {
@@ -92,6 +101,13 @@ export default function CommentsPanel({
       shareSlug,
       body: body.trim(),
     };
+
+    // Include guest credentials if not logged in with a real account
+    if (!loggedIn && session) {
+      payload.guestId = session.guestId;
+      payload.guestName = session.guestName;
+    }
+
     if (pendingCommentAnchor?.milestoneId) {
       payload.milestoneId = pendingCommentAnchor.milestoneId;
     }
@@ -106,10 +122,6 @@ export default function CommentsPanel({
       body: JSON.stringify(payload),
     });
     setLoading(false);
-    if (res.status === 401) {
-      setMessage("Log in to leave a comment.");
-      return;
-    }
     if (!res.ok) {
       const err = await res.json();
       setMessage(err.error ?? "Could not post comment.");
@@ -119,6 +131,36 @@ export default function CommentsPanel({
     setCommentAnchorMode("general");
     setPendingCommentAnchor(null);
     await loadComments();
+  };
+
+  const postComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!body.trim() || !shareSlug) return;
+
+    // If the user has a real session, post directly
+    if (loggedIn) {
+      await submitComment(null);
+      return;
+    }
+
+    // Guest path — if we already have a session, post directly
+    if (guestSession) {
+      await submitComment(guestSession);
+      return;
+    }
+
+    // No session yet — show the modal and post after they confirm their name
+    setPendingSubmit(true);
+    setShowGuestModal(true);
+  };
+
+  const handleGuestConfirm = async (session: GuestSession) => {
+    setGuestSession(session);
+    setShowGuestModal(false);
+    if (pendingSubmit) {
+      setPendingSubmit(false);
+      await submitComment(session);
+    }
   };
 
   const deleteComment = async (id: string) => {
@@ -132,103 +174,112 @@ export default function CommentsPanel({
 
   const handleAnchorModeChange = (next: CommentAnchorMode) => {
     setCommentAnchorMode(next);
-    if (next === "general") {
-      setPendingCommentAnchor(null);
-    } else if (next === "milestone") {
-      setPendingCommentAnchor(null);
-    } else {
-      setPendingCommentAnchor(null);
-    }
+    setPendingCommentAnchor(null);
   };
 
   const handleCommentClick = (c: MapComment) => {
-    const hasAnchor =
-      c.milestoneId || (c.pinnedDate && c.hemisphere);
+    const hasAnchor = c.milestoneId || (c.pinnedDate && c.hemisphere);
     if (!hasAnchor) return;
     scrollToComment(c.id);
   };
 
   const visibleMilestones = milestones.filter((m) => !m.isPersonal);
 
+  // Viewer can comment if logged in OR if they have (or will set) a guest session
+  const canComment = mode === "viewer" && loggedIn !== null;
+
   return (
-    <aside className="flex w-96 shrink-0 flex-col border-l border-slate-200 bg-white">
-      <div className="border-b border-slate-100 px-4 py-3">
-        <h2 className="text-sm font-semibold text-slate-900">Comments</h2>
-        <p className="text-xs text-slate-500">
-          {mapName || (mode === "owner" ? "Your map" : "Shared map")}
-        </p>
-        {mode === "owner" && (
-          <p className="mt-1 text-[10px] text-slate-500">
-            Feedback from viewers on your shared map. Click a pinned comment to jump to its location.
+    <>
+      {showGuestModal && (
+        <GuestNameModal
+          onConfirm={handleGuestConfirm}
+          onCancel={() => {
+            setShowGuestModal(false);
+            setPendingSubmit(false);
+          }}
+        />
+      )}
+
+      <aside className="flex w-96 shrink-0 flex-col border-l border-slate-200 bg-white">
+        <div className="border-b border-slate-100 px-4 py-3">
+          <h2 className="text-sm font-semibold text-slate-900">Comments</h2>
+          <p className="text-xs text-slate-500">
+            {mapName || (mode === "owner" ? "Your map" : "Shared map")}
           </p>
-        )}
-      </div>
-
-      <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-        {comments.length === 0 && (
-          <p className="text-xs text-slate-500">No comments yet.</p>
-        )}
-        {comments.map((c) => {
-          const hasAnchor =
-            c.milestoneId || (c.pinnedDate && c.hemisphere);
-          const isFocused = focusedCommentId === c.id;
-          return (
-            <div
-              key={c.id}
-              ref={(el) => {
-                itemRefs.current[c.id] = el;
-              }}
-              onClick={() => handleCommentClick(c)}
-              className={`rounded-lg border p-3 transition-colors ${
-                hasAnchor ? "cursor-pointer hover:border-sky-200" : ""
-              } ${
-                isFocused
-                  ? "border-sky-400 bg-sky-50 ring-1 ring-sky-200"
-                  : "border-slate-100 bg-slate-50"
-              }`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-medium text-slate-700">{c.authorName}</p>
-                <p className="text-[10px] text-slate-400">
-                  {new Date(c.createdAt).toLocaleString()}
-                </p>
-              </div>
-              {c.anchorLabel && (
-                <p className="mt-1 text-[10px] font-medium text-sky-700">
-                  {c.anchorLabel}
-                </p>
-              )}
-              <p className="mt-1 text-sm text-slate-800 whitespace-pre-wrap">{c.body}</p>
-              {loggedIn && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteComment(c.id);
-                  }}
-                  className="mt-2 text-[10px] text-red-600 hover:underline"
-                >
-                  Delete
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {mode === "viewer" && (
-        <div className="border-t border-slate-100 p-4">
-          {loggedIn === false && (
-            <p className="mb-2 text-xs text-slate-600">
-              <Link
-                href={`/login?next=/m/${shareSlug}`}
-                className="underline"
-              >
-                Log in
-              </Link>{" "}
-              to leave a comment.
+          {mode === "owner" && (
+            <p className="mt-1 text-[10px] text-slate-500">
+              Feedback from viewers on your shared map. Click a pinned comment to jump to its location.
             </p>
           )}
-          {loggedIn && (
+        </div>
+
+        <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+          {comments.length === 0 && (
+            <p className="text-xs text-slate-500">No comments yet.</p>
+          )}
+          {comments.map((c) => {
+            const hasAnchor = c.milestoneId || (c.pinnedDate && c.hemisphere);
+            const isFocused = focusedCommentId === c.id;
+            return (
+              <div
+                key={c.id}
+                ref={(el) => {
+                  itemRefs.current[c.id] = el;
+                }}
+                onClick={() => handleCommentClick(c)}
+                className={`rounded-lg border p-3 transition-colors ${
+                  hasAnchor ? "cursor-pointer hover:border-sky-200" : ""
+                } ${
+                  isFocused
+                    ? "border-sky-400 bg-sky-50 ring-1 ring-sky-200"
+                    : "border-slate-100 bg-slate-50"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-slate-700">{c.authorName}</p>
+                  <p className="text-[10px] text-slate-400">
+                    {new Date(c.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                {c.anchorLabel && (
+                  <p className="mt-1 text-[10px] font-medium text-sky-700">
+                    {c.anchorLabel}
+                  </p>
+                )}
+                <p className="mt-1 text-sm text-slate-800 whitespace-pre-wrap">{c.body}</p>
+                {loggedIn && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteComment(c.id);
+                    }}
+                    className="mt-2 text-[10px] text-red-600 hover:underline"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {canComment && (
+          <div className="border-t border-slate-100 p-4">
+            {guestSession && !loggedIn && (
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-[10px] text-slate-500">
+                  Commenting as <span className="font-medium text-slate-700">{guestSession.guestName}</span>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowGuestModal(true)}
+                  className="text-[10px] text-sky-600 hover:underline"
+                >
+                  Change name
+                </button>
+              </div>
+            )}
+
             <form onSubmit={postComment} className="space-y-2">
               <div className="flex flex-wrap gap-1">
                 {(
@@ -299,7 +350,11 @@ export default function CommentsPanel({
                 onChange={(e) => setBody(e.target.value)}
                 rows={3}
                 maxLength={2000}
-                placeholder="Add a comment…"
+                placeholder={
+                  guestSession || loggedIn
+                    ? "Add a comment…"
+                    : "Add a comment… (you'll pick a display name)"
+                }
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               />
               <button
@@ -310,10 +365,10 @@ export default function CommentsPanel({
                 {loading ? "Posting…" : "Post comment"}
               </button>
             </form>
-          )}
-          {message && <p className="mt-2 text-xs text-red-600">{message}</p>}
-        </div>
-      )}
-    </aside>
+            {message && <p className="mt-2 text-xs text-red-600">{message}</p>}
+          </div>
+        )}
+      </aside>
+    </>
   );
 }

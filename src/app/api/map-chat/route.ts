@@ -8,12 +8,24 @@ import {
 } from "@/lib/voyage";
 import { resolveOwnerMapContext } from "@/lib/mapContext";
 import { fetchMapPayload } from "@/lib/mapData";
+import {
+  loadUserApiKeys,
+  missingAnthropicKeyResponse,
+} from "@/lib/userApiKeys";
 
 const TOKEN_THRESHOLD = 120000;
 const CHARS_PER_TOKEN = 4;
 
 export async function POST(req: NextRequest) {
   const ctx = await resolveOwnerMapContext();
+  const keys = await loadUserApiKeys(ctx.userId!);
+  if (!keys.anthropicApiKey) {
+    return new Response(JSON.stringify(missingAnthropicKeyResponse()), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   const { question } = await req.json();
   const payload = await fetchMapPayload(ctx.mapId);
 
@@ -30,7 +42,7 @@ export async function POST(req: NextRequest) {
 
   if (estimatedTokens > TOKEN_THRESHOLD) {
     contextMode = "retrieved";
-    const queryEmbedding = await embedQuery(question);
+    const queryEmbedding = await embedQuery(question, keys.voyageApiKey);
     if (queryEmbedding) {
       const scoredFragments = payload.fragments
         .filter((f) => f.embedding)
@@ -109,7 +121,11 @@ ${contextText}
 
 Answer the user's question based on this data. Be specific, reference dates, narratives, notes, and patterns. Note gaps and convergences.`;
 
-  const stream = await streamMapChat(systemPrompt, question);
+  const stream = await streamMapChat(
+    keys.anthropicApiKey,
+    systemPrompt,
+    question
+  );
 
   const encoder = new TextEncoder();
   const readable = new ReadableStream({

@@ -4,10 +4,20 @@ import { aiNewsSignals } from "@/lib/schema";
 import { streamSignalScan, parseScanResults } from "@/lib/anthropic";
 import { readOnlyResponse, resolveOwnerMapContext } from "@/lib/mapContext";
 import { fetchMapPayload } from "@/lib/mapData";
+import {
+  loadUserApiKeys,
+  missingAnthropicKeyResponse,
+} from "@/lib/userApiKeys";
 
 export async function POST() {
   const ctx = await resolveOwnerMapContext();
   if (!ctx.editable) return readOnlyResponse();
+
+  const keys = await loadUserApiKeys(ctx.userId!);
+  if (!keys.anthropicApiKey) {
+    return NextResponse.json(missingAnthropicKeyResponse(), { status: 400 });
+  }
+  const anthropicApiKey = keys.anthropicApiKey;
 
   const db = ctx.db;
   const payload = await fetchMapPayload(ctx.mapId);
@@ -35,6 +45,7 @@ export async function POST() {
     let fullText = "";
     try {
       const textStream = await streamSignalScan(
+        anthropicApiKey,
         payload.narratives.map((n) => ({
           id: n.id,
           title: n.title,
