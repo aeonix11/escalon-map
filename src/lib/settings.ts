@@ -24,15 +24,34 @@ function readEnvFallback(): Partial<AppSettings> {
   };
 }
 
+/** Vercel/serverless has a read-only filesystem — use env vars only. */
+function canUseLocalSettingsFile(): boolean {
+  if (process.env.VERCEL === "1") return false;
+  try {
+    ensureDataDirs();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function persistSettings(settings: AppSettings): AppSettings {
-  ensureDataDirs();
+  if (!canUseLocalSettingsFile()) {
+    applySettingsToEnv(settings);
+    return settings;
+  }
   fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2));
   applySettingsToEnv(settings);
   return settings;
 }
 
 export function readSettings(): AppSettings {
-  ensureDataDirs();
+  if (!canUseLocalSettingsFile()) {
+    const settings = { ...DEFAULT_SETTINGS, ...readEnvFallback() };
+    applySettingsToEnv(settings);
+    return settings;
+  }
+
   if (!fs.existsSync(SETTINGS_PATH)) {
     const initial = { ...DEFAULT_SETTINGS, ...readEnvFallback() };
     return persistSettings(initial);
@@ -42,9 +61,11 @@ export function readSettings(): AppSettings {
     const parsed = JSON.parse(
       fs.readFileSync(SETTINGS_PATH, "utf8")
     ) as Partial<AppSettings>;
-    return { ...DEFAULT_SETTINGS, ...parsed };
+    const settings = { ...DEFAULT_SETTINGS, ...parsed };
+    applySettingsToEnv(settings);
+    return settings;
   } catch {
-    return { ...DEFAULT_SETTINGS };
+    return { ...DEFAULT_SETTINGS, ...readEnvFallback() };
   }
 }
 

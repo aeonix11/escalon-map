@@ -113,8 +113,22 @@ export default function SettingsPage() {
     setSaving(true);
     setMessage(null);
     try {
+      if (!file.name.toLowerCase().endsWith(".json")) {
+        setMessage(
+          "Invalid map file — choose a .json export, not a .db SQLite database."
+        );
+        return;
+      }
+
       const text = await file.text();
-      const data = JSON.parse(text);
+      let data: unknown;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        setMessage("Invalid map file — not valid JSON.");
+        return;
+      }
+
       const res = await fetch("/api/maps", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -128,7 +142,7 @@ export default function SettingsPage() {
       setMessage("Map imported. Reloading…");
       window.location.href = "/";
     } catch {
-      setMessage("Invalid map file.");
+      setMessage("Import failed — check your connection and try again.");
     } finally {
       setSaving(false);
       e.target.value = "";
