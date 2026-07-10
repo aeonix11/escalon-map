@@ -12,7 +12,7 @@ const PUBLIC_PREFIXES = [
 
 function isPublicPath(pathname: string, method: string) {
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return true;
-  if (pathname === "/api/comments" && method === "GET") return true;
+  if (pathname === "/api/comments" && (method === "GET" || method === "POST")) return true;
   return false;
 }
 
