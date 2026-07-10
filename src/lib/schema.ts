@@ -246,6 +246,11 @@ export const comments = pgTable("comments", {
     .notNull()
     .references(() => profiles.id, { onDelete: "cascade" }),
   body: text("body").notNull(),
+  milestoneId: text("milestone_id").references(() => milestones.id, {
+    onDelete: "set null",
+  }),
+  pinnedDate: text("pinned_date"),
+  hemisphere: text("hemisphere").$type<HemisphereType>(),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
     .notNull()
     .defaultNow(),

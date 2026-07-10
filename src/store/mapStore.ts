@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type {
   Fragment,
+  HemisphereType,
   Narrative,
   Note,
   MilestoneSuggestion,
@@ -9,6 +10,27 @@ import type {
 
 export type DrawerMode = "detail" | "intelligence" | "notes" | "comments" | null;
 export type NarrativeFocusMode = "fade" | "hide";
+export type CommentAnchorMode = "general" | "timeline" | "milestone";
+
+export interface MapComment {
+  id: string;
+  body: string;
+  createdAt: string;
+  userId: string;
+  authorName: string;
+  milestoneId: string | null;
+  pinnedDate: string | null;
+  hemisphere: HemisphereType | null;
+  milestoneTitle?: string | null;
+  anchorLabel: string | null;
+}
+
+export interface PendingCommentAnchor {
+  milestoneId?: string | null;
+  pinnedDate?: string | null;
+  hemisphere?: HemisphereType | null;
+  label?: string | null;
+}
 
 export interface MapSummary {
   id: string;
@@ -45,6 +67,12 @@ interface MapState {
   visibility: "private" | "public";
   availableMaps: MapSummary[];
   viewerLoggedIn: boolean;
+  mapComments: MapComment[];
+  commentAnchorMode: CommentAnchorMode;
+  commentPinMode: boolean;
+  pendingCommentAnchor: PendingCommentAnchor | null;
+  focusedCommentId: string | null;
+  scrollToCommentId: string | null;
   setZoomScale: (scale: number) => void;
   setActiveNarrativeId: (id: string | null) => void;
   toggleHidePersonalMilestones: () => void;
@@ -73,6 +101,13 @@ interface MapState {
     availableMaps: MapSummary[];
     viewerLoggedIn?: boolean;
   }) => void;
+  setMapComments: (comments: MapComment[]) => void;
+  setCommentAnchorMode: (mode: CommentAnchorMode) => void;
+  setCommentPinMode: (enabled: boolean) => void;
+  setPendingCommentAnchor: (anchor: PendingCommentAnchor | null) => void;
+  setFocusedCommentId: (id: string | null) => void;
+  scrollToComment: (id: string) => void;
+  clearScrollToComment: () => void;
 }
 
 export const useMapStore = create<MapState>((set) => ({
@@ -100,6 +135,12 @@ export const useMapStore = create<MapState>((set) => ({
   visibility: "private",
   availableMaps: [],
   viewerLoggedIn: false,
+  mapComments: [],
+  commentAnchorMode: "general",
+  commentPinMode: false,
+  pendingCommentAnchor: null,
+  focusedCommentId: null,
+  scrollToCommentId: null,
   setZoomScale: (scale) => set({ zoomScale: scale }),
   setActiveNarrativeId: (id) =>
     set((s) => ({
@@ -174,4 +215,22 @@ export const useMapStore = create<MapState>((set) => ({
       availableMaps: ctx.availableMaps,
       viewerLoggedIn: ctx.viewerLoggedIn ?? false,
     }),
+  setMapComments: (comments) => set({ mapComments: comments }),
+  setCommentAnchorMode: (mode) =>
+    set((s) => ({
+      commentAnchorMode: mode,
+      commentPinMode: mode === "timeline",
+      pendingCommentAnchor: mode === "general" ? null : s.pendingCommentAnchor,
+    })),
+  setCommentPinMode: (enabled) =>
+    set((s) => ({
+      commentPinMode: enabled,
+      commentAnchorMode: enabled ? "timeline" : s.commentAnchorMode,
+      pendingCommentAnchor: enabled ? null : s.pendingCommentAnchor,
+    })),
+  setPendingCommentAnchor: (anchor) => set({ pendingCommentAnchor: anchor }),
+  setFocusedCommentId: (id) => set({ focusedCommentId: id }),
+  scrollToComment: (id) =>
+    set({ scrollToCommentId: id, focusedCommentId: id }),
+  clearScrollToComment: () => set({ scrollToCommentId: null }),
 }));

@@ -12,6 +12,7 @@ import AddNarrativeForm from "@/components/forms/AddNarrativeForm";
 import AddMilestoneForm from "@/components/forms/AddMilestoneForm";
 import AddFragmentForm from "@/components/forms/AddFragmentForm";
 import NotesPanel from "@/components/notes/NotesPanel";
+import CommentsPanel from "@/components/comments/CommentsPanel";
 import { useRssPoll } from "@/hooks/useRssPoll";
 import type { AiNewsSignal, RssFeed } from "@/lib/schema";
 
@@ -38,6 +39,7 @@ export default function DashboardContainer() {
     notes,
     activeMapName,
     readOnly,
+    activeMapId,
   } = useMapStore();
 
   const [signals, setSignals] = useState<AiNewsSignal[]>([]);
@@ -45,6 +47,7 @@ export default function DashboardContainer() {
   const [showForms, setShowForms] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [commentCount, setCommentCount] = useState(0);
 
   const refresh = () => setRefreshKey((k) => k + 1);
 
@@ -106,6 +109,16 @@ export default function DashboardContainer() {
   useEffect(() => {
     loadSettings().then(loadData);
   }, [refreshKey]);
+
+  useEffect(() => {
+    if (!activeMapId) return;
+    fetch(`/api/comments?mapId=${encodeURIComponent(activeMapId)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data) setCommentCount(data.comments?.length ?? 0);
+      })
+      .catch(() => {});
+  }, [activeMapId, refreshKey]);
 
   useRssPoll(readOnly ? () => {} : refresh);
 
@@ -222,6 +235,21 @@ export default function DashboardContainer() {
           )}
           <button
             onClick={() =>
+              setDrawerMode(drawerMode === "comments" ? null : "comments")
+            }
+            className={`rounded px-3 py-1.5 text-xs ${
+              drawerMode === "comments"
+                ? "bg-sky-200 text-sky-900 ring-2 ring-sky-300"
+                : "bg-sky-100 text-sky-800 hover:bg-sky-200"
+            }`}
+          >
+            Comments
+            {commentCount > 0 && (
+              <span className="ml-1 font-medium">({commentCount})</span>
+            )}
+          </button>
+          <button
+            onClick={() =>
               setDrawerMode(drawerMode === "intelligence" ? null : "intelligence")
             }
             className="rounded bg-violet-100 px-3 py-1.5 text-xs text-violet-700 hover:bg-violet-200"
@@ -307,6 +335,13 @@ export default function DashboardContainer() {
         )}
         {drawerMode === "notes" && (
           <NotesPanel onRefresh={refresh} readOnly={readOnly} />
+        )}
+        {drawerMode === "comments" && activeMapId && (
+          <CommentsPanel
+            mode="owner"
+            mapId={activeMapId}
+            onCommentCountChange={setCommentCount}
+          />
         )}
       </div>
 

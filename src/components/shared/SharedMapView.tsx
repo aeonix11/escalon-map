@@ -134,7 +134,7 @@ export default function SharedMapView({ shareSlug }: SharedMapViewProps) {
             <MapIntelligencePanel onRefresh={() => {}} readOnly={readOnly} />
           )}
           {drawerMode === "comments" && (
-            <CommentsPanel shareSlug={shareSlug} />
+            <CommentsPanel mode="viewer" shareSlug={shareSlug} />
           )}
         </div>
       )}
