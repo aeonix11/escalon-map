@@ -8,6 +8,7 @@ import type { Fragment, MilestoneWithNarratives, MilestoneSuggestion } from "@/l
 
 interface DetailContextDrawerProps {
   onRefresh: () => void;
+  readOnly?: boolean;
 }
 
 function fragmentLabel(f: Fragment): string {
@@ -43,7 +44,10 @@ function Divider() {
   return <div className="border-t border-slate-100 my-5" />;
 }
 
-export default function DetailContextDrawer({ onRefresh }: DetailContextDrawerProps) {
+export default function DetailContextDrawer({
+  onRefresh,
+  readOnly = false,
+}: DetailContextDrawerProps) {
   const {
     selectedMilestoneId,
     selectedSuggestionId,
@@ -270,22 +274,24 @@ export default function DetailContextDrawer({ onRefresh }: DetailContextDrawerPr
           )}
 
           <Divider />
-          <div className="flex flex-col gap-2">
-            <button
-              onClick={() => void handleAcceptSuggestion(suggestion)}
-              disabled={saving}
-              className="rounded bg-emerald-600 py-2.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
-            >
-              {saving ? "Adding…" : "Add to timeline"}
-            </button>
-            <button
-              onClick={() => void handleDismissSuggestion(suggestion)}
-              disabled={deleting}
-              className="rounded border border-slate-200 py-2 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-            >
-              Dismiss suggestion
-            </button>
-          </div>
+          {!readOnly && (
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => void handleAcceptSuggestion(suggestion)}
+                disabled={saving}
+                className="rounded bg-emerald-600 py-2.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+              >
+                {saving ? "Adding…" : "Add to timeline"}
+              </button>
+              <button
+                onClick={() => void handleDismissSuggestion(suggestion)}
+                disabled={deleting}
+                className="rounded border border-slate-200 py-2 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Dismiss suggestion
+              </button>
+            </div>
+          )}
         </div>
       </aside>
     );
@@ -312,7 +318,7 @@ export default function DetailContextDrawer({ onRefresh }: DetailContextDrawerPr
           {editing ? "Edit Milestone" : "Milestone"}
         </h2>
         <div className="flex items-center gap-3">
-          {!editing && (
+          {!readOnly && !editing && (
             <button
               onClick={() => { setError(null); setEditing(true); }}
               className="text-xs text-sky-600 hover:text-sky-700"
@@ -320,7 +326,7 @@ export default function DetailContextDrawer({ onRefresh }: DetailContextDrawerPr
               Edit
             </button>
           )}
-          {!editing && (
+          {!readOnly && !editing && (
             <button
               onClick={handleDeleteMilestone}
               disabled={deleting}
@@ -536,7 +542,7 @@ export default function DetailContextDrawer({ onRefresh }: DetailContextDrawerPr
               <p className="text-xs text-slate-400 mb-3">No video linked yet.</p>
             )}
 
-            {fragments.length > 0 && (
+            {!readOnly && fragments.length > 0 && (
               <div className="space-y-2">
                 <select
                   value={linkFragmentId}
@@ -569,7 +575,7 @@ export default function DetailContextDrawer({ onRefresh }: DetailContextDrawerPr
               </div>
             )}
 
-            {fragments.length === 0 && (
+            {!readOnly && fragments.length === 0 && (
               <p className="text-xs text-slate-400">Add a video fragment via Add Data first.</p>
             )}
           </div>

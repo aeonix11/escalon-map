@@ -6,6 +6,8 @@ import { useMapStore } from "@/store/mapStore";
 import TimelineCanvas from "@/components/timeline/TimelineCanvas";
 import MapIntelligencePanel from "@/components/ai-feed/MapIntelligencePanel";
 import CommentsPanel from "@/components/comments/CommentsPanel";
+import DetailContextDrawer from "@/components/layout/DetailContextDrawer";
+import VideoModal from "@/components/timeline/VideoModal";
 import NarrativeFilterBar from "@/components/shared/NarrativeFilterBar";
 import type { AiNewsSignal, RssFeed } from "@/lib/schema";
 
@@ -26,6 +28,10 @@ export default function SharedMapView({ shareSlug }: SharedMapViewProps) {
     narratives,
     activeNarrativeId,
     setActiveNarrativeId,
+    videoModalOpen,
+    closeVideoModal,
+    videoModalUrl,
+    videoModalFragments,
   } = useMapStore();
 
   const [signals, setSignals] = useState<AiNewsSignal[]>([]);
@@ -92,12 +98,9 @@ export default function SharedMapView({ shareSlug }: SharedMapViewProps) {
             Map Intelligence
           </button>
           {!viewerLoggedIn ? (
-            <Link
-              href={`/login?next=/m/${shareSlug}`}
-              className="rounded bg-slate-800 px-3 py-1.5 text-xs text-white hover:bg-slate-700"
-            >
-              Log in to comment
-            </Link>
+            <span className="rounded bg-slate-100 px-3 py-1.5 text-xs text-slate-600">
+              Comment with a display name
+            </span>
           ) : (
             <Link
               href="/"
@@ -133,10 +136,23 @@ export default function SharedMapView({ shareSlug }: SharedMapViewProps) {
           {drawerMode === "intelligence" && (
             <MapIntelligencePanel onRefresh={() => {}} readOnly={readOnly} />
           )}
+          {drawerMode === "detail" && (
+            <DetailContextDrawer onRefresh={() => {}} readOnly />
+          )}
           {drawerMode === "comments" && (
             <CommentsPanel mode="viewer" shareSlug={shareSlug} />
           )}
         </div>
+      )}
+
+      {videoModalOpen && videoModalUrl && (
+        <VideoModal
+          url={videoModalUrl}
+          fragments={videoModalFragments}
+          onClose={closeVideoModal}
+          onRefresh={() => {}}
+          readOnly
+        />
       )}
     </div>
   );

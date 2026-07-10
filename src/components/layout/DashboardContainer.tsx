@@ -327,8 +327,8 @@ export default function DashboardContainer() {
           </div>
         </main>
 
-        {drawerMode === "detail" && !readOnly && (
-          <DetailContextDrawer onRefresh={refresh} />
+        {drawerMode === "detail" && (
+          <DetailContextDrawer onRefresh={refresh} readOnly={readOnly} />
         )}
         {drawerMode === "intelligence" && (
           <MapIntelligencePanel onRefresh={loadData} readOnly={readOnly} />
