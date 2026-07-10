@@ -12,7 +12,7 @@ import MilestoneAnchorLines from "./MilestoneAnchorLines";
 import NoteAnchorLines from "./NoteAnchorLines";
 import NowMarker from "./NowMarker";
 import CommentPin from "@/components/comments/CommentPin";
-import { pixelToTimelineAnchor } from "@/lib/commentAnchors";
+import { clientPointToTimelineAnchor } from "@/lib/commentAnchors";
 import {
   TIMELINE_END_YEAR,
   TIMELINE_START_YEAR,
@@ -67,7 +67,9 @@ export default function TimelineCanvas() {
     pendingCommentAnchor,
     focusedCommentId,
     scrollToCommentId,
+    readOnly,
     setPendingCommentAnchor,
+    setCommentAnchorMode,
     scrollToComment,
     clearScrollToComment,
   } = useMapStore();
@@ -272,19 +274,13 @@ export default function TimelineCanvas() {
     clearScrollToComment,
   ]);
 
-  const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!commentPinMode || e.target !== e.currentTarget) return;
-
-    const canvasRect = canvasRef.current!.getBoundingClientRect();
-    const scrollEl = scrollRef.current;
-    if (!scrollEl) return;
-
-    const leftPixel =
-      e.clientX - canvasRect.left + scrollEl.scrollLeft;
-    const clickY = e.clientY - canvasRect.top + scrollEl.scrollTop;
-    const anchor = pixelToTimelineAnchor(
-      leftPixel,
-      clickY,
+  const placeTimelinePin = (clientX: number, clientY: number) => {
+    if (!canvasRef.current) return;
+    const canvasRect = canvasRef.current.getBoundingClientRect();
+    const anchor = clientPointToTimelineAnchor(
+      clientX,
+      clientY,
+      canvasRect,
       centerY,
       baseWidthPerYear
     );
@@ -300,7 +296,29 @@ export default function TimelineCanvas() {
     });
   };
 
-  const handleMilestoneClick = (id: string, isSuggested: boolean) => {
+  const handlePinOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    placeTimelinePin(e.clientX, e.clientY);
+  };
+
+  const attachCommentToMilestone = (id: string, title: string) => {
+    setCommentAnchorMode("milestone");
+    setPendingCommentAnchor({
+      milestoneId: id,
+      label: `On: ${title}`,
+    });
+  };
+
+  const handleMilestoneClick = (
+    id: string,
+    isSuggested: boolean,
+    title: string,
+    isPersonal: boolean
+  ) => {
+    if (drawerMode === "comments" && readOnly && !isSuggested && !isPersonal) {
+      attachCommentToMilestone(id, title);
+      return;
+    }
     if (isSuggested) {
       setSelectedSuggestionId(id);
     } else {
@@ -323,7 +341,6 @@ export default function TimelineCanvas() {
     >
       <div
         ref={canvasRef}
-        onClick={handleCanvasClick}
         style={{ width: `${canvasWidth}px`, minHeight: `${contentHeight}px` }}
         className="relative"
       >
@@ -416,6 +433,13 @@ export default function TimelineCanvas() {
           const isHovered = hoveredMilestoneId === m.id;
           const isDimmed =
             hoveredMilestoneId !== null && hoveredMilestoneId !== m.id;
+          const isCommentTarget =
+            drawerMode === "comments" &&
+            readOnly &&
+            !m.isAiSuggested &&
+            !m.isPersonal;
+          const isSelectedForComment =
+            pendingCommentAnchor?.milestoneId === m.id;
 
           return (
             <div
@@ -431,13 +455,22 @@ export default function TimelineCanvas() {
               }}
               className={`absolute w-[260px] pointer-events-auto transition-all duration-200 ease-out ${
                 isHovered ? "z-[14] scale-[1.02]" : "z-[12]"
+              } ${isCommentTarget ? "cursor-pointer" : ""} ${
+                isSelectedForComment ? "ring-2 ring-sky-400 rounded-lg" : ""
               }`}
             >
               <MilestoneCard
                 data={m}
                 variant={isUpper ? "prophetic" : "earthly"}
                 zoomLevel={zoomLevel}
-                onClick={() => handleMilestoneClick(m.id, Boolean(m.isAiSuggested))}
+                onClick={() =>
+                  handleMilestoneClick(
+                    m.id,
+                    Boolean(m.isAiSuggested),
+                    m.title,
+                    Boolean(m.isPersonal)
+                  )
+                }
               />
             </div>
           );
@@ -489,8 +522,16 @@ export default function TimelineCanvas() {
             </div>
           )}
 
+        {commentPinMode && (
+          <div
+            className="absolute inset-0 z-[18] cursor-crosshair"
+            onClick={handlePinOverlayClick}
+            aria-label="Click to place comment pin"
+          />
+        )}
+
         <div
-          className="absolute top-[50%] translate-y-[-50%] w-full h-20 bg-white/95 border-y-2 border-slate-300 shadow-md z-10 pointer-events-none"
+          className="absolute top-[50%] translate-y-[-50%] w-full h-20 bg-white/95 border-y-2 border-slate-300 shadow-md z-[20] pointer-events-none"
         >
           <CentralTimeAxis
             scale={zoomLevel}

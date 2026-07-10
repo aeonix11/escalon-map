@@ -1,25 +1,23 @@
-<img width="2541" height="1152" alt="{BA91BC63-AA55-4F2A-A2EB-471CDD66EC64}" src="https://github.com/user-attachments/assets/7390d4d3-1c40-4543-b088-98b886e8d8df" />
-
-
+<img width="2541" height="1152" alt="Escalon Map timeline screenshot" src="https://github.com/user-attachments/assets/7390d4d3-1c40-4543-b088-98b886e8d8df" />
 
 # Escalon Map
 
-A local-first timeline workspace for mapping **prophetic insight** and **real-world signals** on one canvas — from 2012 through 2075.
+A timeline workspace for mapping **prophetic insight** and **real-world signals** on one canvas — from 2012 through 2075.
 
-Escalon Map is built for people who track long-range narratives: dreams, prophecies, geopolitical events, market cycles, and how they might line up over time. Instead of scattered notes and spreadsheets, you get a single **dual-hemisphere timeline** where vision sits above the axis and earthly confirmation sits below it.
+Escalon Map is built for people who track long-range narratives: dreams, prophecies, geopolitics, market cycles, and how they might line up over time. You get a single **dual-hemisphere timeline** where vision sits above the axis and earthly confirmation sits below it.
 
-Everything runs on **your computer**. Your map, notes, and API keys stay in a local `data/` folder — nothing is uploaded to a cloud server unless you choose to export and share a file.
+**Live demo:** [escalon-map.vercel.app](https://escalon-map.vercel.app)
 
 ---
 
 ## What you use it for
 
-- **Build your timeline** — place milestones on prophetic or earthly tracks, grouped by colored narratives (wealth transfer, geopolitics, health crises, etc.)
-- **Connect evidence** — attach video clip fragments and notes to dates; link milestones to source material
-- **Watch for convergence** — zoom from decade view down to seasonal detail; spotlight one narrative to see how its thread weaves through time
-- **Monitor the news** — pull RSS feeds into a Signal Hub inbox and match headlines to your narratives (with an Anthropic API key)
-- **Ask questions of your map** — Map Intelligence chat and deep analysis can summarize patterns and suggest new milestone ideas on the timeline (optional AI features)
-- **Compare with others** — import a friend's exported map as a **read-only** view without merging it into yours
+- **Build your timeline** — place milestones on prophetic or earthly tracks, grouped by colored narratives
+- **Connect evidence** — attach video fragments and notes to dates; link milestones to source material
+- **Watch for convergence** — zoom from decade view down to seasonal detail; spotlight one narrative to fade or hide the rest
+- **Monitor the news** — RSS feeds in the Signal Hub inbox; match headlines to narratives (optional AI)
+- **Ask questions of your map** — Map Intelligence chat and deep analysis (optional AI, your own API keys)
+- **Share with others** — public view-only links; viewers can leave map-anchored comments when logged in
 
 ---
 
@@ -28,149 +26,211 @@ Everything runs on **your computer**. Your map, notes, and API keys stay in a lo
 ### Timeline
 
 - **Dual hemispheres** — prophetic (upper) and earthly (lower) on one scrollable canvas
-- **Narratives** — color-coded story threads; click to spotlight and dim everything else
-- **Milestones** — fixed or fuzzy date ranges; optional personal (private) milestones you can hide from the view
-- **AI-suggested milestones** — from deep analysis, shown as dashed boxes until you accept or dismiss them
+- **Narratives** — color-coded threads; milestones can belong to multiple narratives
+- **Milestones** — fixed or fuzzy date ranges; optional personal items you can hide from view
+- **AI-suggested milestones** — from deep analysis, shown as dashed boxes until accepted or dismissed
 - **Notes** — pin notes to dates on either hemisphere
-- **Video fragments** — timestamped clips from sources (e.g. YouTube), linked to milestones
-- **Now marker** — today's date on the timeline; app opens centered on the present
-- **Semantic zoom** — scroll wheel (Ctrl + scroll) and slider from decadal → yearly → seasonal density
+- **Video fragments** — timestamped clips linked to milestones
+- **Now marker** — today's date on the timeline
+- **Semantic zoom** — Ctrl + scroll wheel and slider (decadal → yearly → seasonal)
 
-### Signal Hub
+### Sharing & comments
 
-- **RSS feeds** — subscribe to news sources; background polling on Windows (optional scheduler)
-- **Inbox** — incoming signals with accept / dismiss / match-to-narrative workflow
-- **AI matching** — Claude can reason about whether a headline fits a narrative (requires API key)
+- **One map per account** — sign up and get your own editable map
+- **Public share links** — `/m/your-slug` for view-only access
+- **Map-anchored comments** — viewers pin feedback to a date or milestone; you review comments on your dashboard
+- **Export / import** — JSON backup and migration from older local installs
 
-### Map Intelligence
+### Signal Hub & Map Intelligence (optional)
 
-- **Chat** — ask questions about your map ("what years converge?", "gaps in my narratives?")
-- **Deep analysis** — full research report plus suggested milestones placed on the timeline (requires API key; My Map only)
+- **RSS feeds** — subscribe to sources; poll for new headlines
+- **AI matching** — Claude reasons about whether a signal fits a narrative
+- **Chat & deep analysis** — ask questions about your map; get suggested milestones
 
-### Maps & sharing
+Requires **your own** Anthropic (and optionally Voyage) API keys — see [AI API keys](#ai-api-keys-bring-your-own) below.
 
-- **My Map** — your editable master timeline (`data/maps/my-map.db`)
-- **Shared maps** — import someone else's `.json` export as a separate, view-only snapshot
-- **Export** — download your map as JSON; personal items excluded by default
-- **Settings** — switch maps, manage API keys, add/remove shared maps
+### Privacy controls
 
-### Privacy & local data
-
-- **No account required** — works offline for editing after install
-- **Local SQLite database** — no native build tools needed on Windows (uses sql.js)
-- **API keys stored locally** in `data/settings.json` (never committed to git)
+- **Private by default** — only you edit your map until you set visibility to Public
+- **Personal milestones & notes** — hidden from shared view when you use “Hide personal”
+- **Narrative focus** — fade or hide non-selected narratives on shared maps
 
 ---
 
-## Getting started
+## Quick start (hosted)
 
-### Easiest way (Windows)
+1. Open [escalon-map.vercel.app](https://escalon-map.vercel.app) and sign in (Google or magic link).
+2. Your map is created automatically.
+3. Optional: **Settings** → add API keys for AI features.
+4. Optional: **Settings** → set map to **Public** and copy the share link.
 
-#### First time only
+To self-host on Vercel + Supabase (free tier), see **[DEPLOY.md](DEPLOY.md)**.
 
-**Double-click `Install Escalon Map.cmd`**
+---
 
-This downloads Node.js automatically (you do **not** need to install Node yourself), installs app dependencies, and creates a desktop shortcut called **Escalon Map**.
+## Local development
 
-#### Every time after that
+### Prerequisites
 
-**Double-click `Open Escalon Map.bat`** or the **Escalon Map** shortcut on your desktop.
+- Node.js 20+
+- A [Supabase](https://supabase.com) project (free tier is fine)
 
-Keep the black window open while you use the app. Close it to stop.
+### Setup
 
-> If you open `Open Escalon Map.bat` without installing first, it will run the installer for you automatically.
+```bash
+git clone https://github.com/aeonix11/escalon-map.git
+cd escalon-map
+cp .env.example .env.local
+```
 
-## Prerequisites
+Fill in `.env.local`:
 
-- Windows 10/11 with internet (for first-time install only)
-- **Node.js is NOT required** — the installer bundles it in `tools/node/`
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
+| `DATABASE_URL` | Supabase pooled Postgres URI (port 6543) |
+| `NEXT_PUBLIC_SITE_URL` | `http://localhost:3000` for local auth |
+| `ANTHROPIC_API_KEY` | Optional — dev fallback only; prefer per-user keys in Settings |
+| `VOYAGE_API_KEY` | Optional — embeddings / semantic search |
 
-Mac/Linux users still need [Node.js 20+](https://nodejs.org/) installed manually.
+Apply the database schema (Supabase SQL editor or):
 
-## Manual setup
+```bash
+npm install
+npm run db:push
+```
 
-| Platform | First time | Start app |
-|---|---|---|
-| **Windows** | `cmd /c setup.cmd` | Double-click `Open Escalon Map.bat` or `cmd /c start.cmd` |
-| **macOS / Linux** | `chmod +x setup.sh && ./setup.sh` | `./start.sh` |
+Run migrations in order if you use SQL files: `drizzle/0000_init.sql`, then `drizzle/0001_comment_anchors.sql`.
+
+```bash
+npm run dev
+```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Settings page
+In Supabase **Authentication → URL configuration**, add:
 
-Click **Settings** in the app (or go to `/settings`).
-
-### Switch between maps
-
-- **My Map** — your editable timeline
-- **Shared maps** — view-only copies of other people's exports; your map is never changed
-
-Use the dropdown **“Which map are you viewing?”** to switch.
-
-### Share a map
-
-1. Settings → **Export my map** → download the `.json` file
-2. Send the file to someone else
-3. They use Settings → **Add someone else's map** to upload it
-
-No more merging imports into your own timeline.
-
-### Sharing with friends
-
-**What to send:** the app folder (or a GitHub link) plus an exported `.json` map file.
-
-**Never send your `data/` folder** — it contains your private timeline database and API keys.
-
-**Recipient steps:**
-1. Run `Install Escalon Map.cmd` (Windows)
-2. Open the app → Settings → **Add someone else's map**
-3. Select the `.json` file you sent them
-
-Their own map stays separate. Yours is view-only on their machine.
-
-### API keys (optional)
-
-Enter keys in Settings. They are saved locally in `data/settings.json`.
-
-| Key | Used for |
-|---|---|
-| Anthropic | Map Intelligence chat & signal matching |
-| Voyage | Semantic search (optional — not fully working yet) |
-
-The app works without API keys — timeline editing, notes, fragments, and map switching all work offline after install.
+- Site URL: `http://localhost:3000`
+- Redirect URLs: `http://localhost:3000/auth/callback`
 
 ---
 
-## Optional: background RSS polling (Windows)
-```cmd
-cmd /c setup-scheduler.cmd
+## AI API keys (bring your own)
+
+Map Intelligence, signal matching, and deep analysis call **Anthropic** and optionally **Voyage** on your behalf. **You should use your own keys** so usage is billed to you, not the app operator.
+
+### How it works today
+
+| Environment | Where keys live |
+|-------------|-----------------|
+| **Local dev** | Settings page → saved in `data/settings.json` on your machine (not committed to git) |
+| **Hosted (Vercel)** | Settings UI exists, but serverless cannot persist to disk — keys currently fall back to **deployment env vars** if set |
+
+That means on the public deployment, if the operator sets `ANTHROPIC_API_KEY` in Vercel, **everyone’s AI requests could share that one key** until per-user storage is implemented.
+
+### Planned direction: per-user keys in the database
+
+The intended model:
+
+1. Each user saves keys in **Settings** (already in the UI).
+2. Keys are stored **encrypted** in Postgres (per-user row), not plaintext.
+3. A server-only **encryption secret** in Vercel env decrypts keys only when that user runs an AI feature.
+4. API routes never return full keys — only masked hints (`sk-a••••xyz`).
+5. No AI calls without a key configured for the logged-in user.
+
+**Is the database hackable?** Any server-stored secret can be exposed if both the DB and encryption key leak. Standard mitigation:
+
+- Encrypt at rest (AES-256-GCM) with a master secret **outside** the database
+- Row-level access: only the owning user’s keys are ever decrypted
+- Never log keys; mask in API responses
+- Optional: Supabase Vault or a dedicated secrets service for the master key
+
+**Alternatives considered**
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| **Encrypted in DB** (recommended) | Works with server-side AI routes; keys sync across devices | Requires trusting the app host with encrypted blobs |
+| **Browser-only storage** | Server never sees keys | CORS limits direct API calls; keys visible in devtools; harder for server-side features |
+| **No hosted AI** | Zero key risk for operator | Users lose Intelligence features on the web app |
+
+Until per-user encrypted storage ships, **do not put your personal Anthropic key in Vercel env vars** if others will use the same deployment.
+
+---
+
+## Settings
+
+Open **Settings** from the app header (`/settings`).
+
+- **Map name** and **public / private** visibility
+- **Share link** when public
+- **Export** map as JSON
+- **Import** JSON (replaces your cloud map)
+- **API keys** — Anthropic & Voyage
+- **Narrative focus** — fade vs hide non-selected narratives on shared views
+- **Display name** for comments
+
+---
+
+## Sharing workflow
+
+### Share your map
+
+1. Settings → **Sharing** → set visibility to **Public**
+2. Copy the link (`https://…/m/your-slug`)
+3. Send the link — viewers see a read-only timeline
+
+### Comments from viewers
+
+- Viewers must **log in** to post comments
+- They can attach comments to the whole map, a **timeline point**, or a **milestone**
+- You see all comments on your dashboard via the **Comments** panel (with count badge)
+- Click a pinned comment to jump to that location on the map
+
+### Export for backup
+
+Settings → **Export** → download `.json`. Keep backups outside the repo.
+
+---
+
+## Project structure
+
 ```
+src/
+  app/           # Next.js routes (pages + API)
+  components/    # Timeline, comments, settings, AI panels
+  lib/           # DB schema, auth, map data, AI clients
+  store/         # Client state (Zustand)
+drizzle/         # SQL migrations
+DEPLOY.md        # Vercel + Supabase deployment guide
+```
+
+**Stack:** Next.js 15, React 19, Supabase Auth, Postgres (Drizzle ORM), Vercel.
+
+---
+
+## Legacy local desktop install (Windows)
+
+Older versions ran fully offline with SQLite in `data/`. The current default is **cloud + auth**. You can still use the Windows installer scripts for local-only experimentation, but sharing, comments, and multi-user features expect the hosted setup.
+
+See git history / tags if you need the pure local-first workflow.
+
+---
 
 ## Troubleshooting
 
 | Problem | Fix |
-|---|---|
-| "Node.js not installed" | Run **`Install Escalon Map.cmd`** first |
-| Install download fails | Check internet; run installer again |
-| `npm` blocked in PowerShell | Use the `.cmd` / `.bat` files instead |
-| `build.cmd` not found in PowerShell | Run `.\build.cmd` (the `.\` prefix is required) |
-| Port 3000 in use | Close other Escalon Map windows, or run `npm run start -- -p 3001` |
-| Fresh empty map | Delete `data/maps/my-map.db` and restart |
-| Reset API keys | Edit or delete `data/settings.json` |
-| App feels slow on first open | Run `.\build.cmd` once, then use `Open Escalon Map.bat` (production mode) |
-| `Cannot find module './NNN.js'` | Close the app, run `.\build.cmd`, then open again (stale build cache) |
-| Black window opens and closes | Use **Open Escalon Map.bat** directly; run `.\build.cmd` first if needed |
-| Shared map won't update | Re-export from the owner and re-import the new `.json` file |
+|---------|-----|
+| Auth redirect error | Check Supabase Site URL includes `https://` and redirect URLs match your domain |
+| Map empty after login | Import your JSON export via Settings, or wait for seed data on first load |
+| AI features disabled | Add your Anthropic key in Settings (per-user DB storage coming soon) |
+| Comments not anchoring | Run `drizzle/0001_comment_anchors.sql` on your database |
+| `DATABASE_URL is not set` | Add Supabase pooled connection string to env vars |
 
-## Before you share publicly
+More deployment notes: **[DEPLOY.md](DEPLOY.md)**.
 
-- **Rotate API keys** if `data/settings.json` was ever copied or zipped with the project
-- Confirm `data/` is **not** in git: `git ls-files data` should return nothing
-- Run `.\build.cmd` after updates so friends get a production build
-- Export maps as `.json` only — personal milestones are excluded unless you check the box
+---
 
-## Database
+## License
 
-Local SQLite (`data/maps/my-map.db`) via Drizzle ORM + **sql.js** (no native build tools required on Windows).
-
-Legacy `escalon.db` in the project root is migrated automatically to `data/maps/my-map.db` on first run.
+Private project — check with the repository owner before redistributing.

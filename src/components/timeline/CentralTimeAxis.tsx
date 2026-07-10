@@ -73,9 +73,18 @@ export default function CentralTimeAxis({
         {ticks.map((tick, i) => (
           <div
             key={`${tick.kind}-${tick.left}-${i}`}
-            className="absolute flex flex-col items-center -translate-x-1/2 z-[2]"
+            className="absolute flex flex-col items-center -translate-x-1/2 z-[3] pointer-events-none"
             style={{ left: `${tick.left}px` }}
           >
+            {tick.kind === "decade" ? (
+              <span className="mb-1 rounded-md border-2 border-slate-400 bg-white px-2.5 py-0.5 text-[13px] font-bold tabular-nums text-slate-900 shadow-md">
+                {tick.label}
+              </span>
+            ) : tick.kind === "year" ? (
+              <span className="mb-0.5 rounded border border-slate-300 bg-white px-1.5 py-px text-[11px] font-bold tabular-nums text-slate-800 shadow-sm">
+                {tick.label}
+              </span>
+            ) : null}
             <div
               className={
                 tick.kind === "decade"
@@ -85,16 +94,8 @@ export default function CentralTimeAxis({
                     : "h-2 w-px bg-slate-400"
               }
             />
-            {tick.kind === "decade" ? (
-              <span className="mt-1 rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[12px] font-bold tabular-nums text-slate-900 shadow-sm">
-                {tick.label}
-              </span>
-            ) : tick.kind === "year" ? (
-              <span className="mt-1 rounded border border-slate-200 bg-white/95 px-1.5 py-px text-[11px] font-semibold tabular-nums text-slate-800 shadow-sm">
-                {tick.label}
-              </span>
-            ) : (
-              <span className="mt-0.5 rounded bg-slate-100/90 px-1 text-[9px] font-medium tabular-nums text-slate-600">
+            {tick.kind === "month" && (
+              <span className="mt-0.5 rounded bg-white/95 px-1 text-[9px] font-semibold tabular-nums text-slate-600 shadow-sm">
                 {tick.label}
               </span>
             )}

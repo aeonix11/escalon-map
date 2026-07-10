@@ -262,29 +262,36 @@ export default function CommentsPanel({
               )}
 
               {commentAnchorMode === "milestone" && (
-                <select
-                  value={pendingCommentAnchor?.milestoneId ?? ""}
-                  onChange={(e) => {
-                    const id = e.target.value || null;
-                    const ms = visibleMilestones.find((m) => m.id === id);
-                    setPendingCommentAnchor(
-                      id
-                        ? {
-                            milestoneId: id,
-                            label: ms ? `On: ${ms.title}` : null,
-                          }
-                        : null
-                    );
-                  }}
-                  className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
-                >
-                  <option value="">Select a milestone…</option>
-                  {visibleMilestones.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.title} ({m.targetDate.slice(0, 7)})
-                    </option>
-                  ))}
-                </select>
+                <div className="space-y-1">
+                  <p className="text-[10px] text-sky-700">
+                    {pendingCommentAnchor?.milestoneId
+                      ? `Attached to ${pendingCommentAnchor.label ?? "milestone"}`
+                      : "Click a milestone on the map to attach your comment."}
+                  </p>
+                  <select
+                    value={pendingCommentAnchor?.milestoneId ?? ""}
+                    onChange={(e) => {
+                      const id = e.target.value || null;
+                      const ms = visibleMilestones.find((m) => m.id === id);
+                      setPendingCommentAnchor(
+                        id
+                          ? {
+                              milestoneId: id,
+                              label: ms ? `On: ${ms.title}` : null,
+                            }
+                          : null
+                      );
+                    }}
+                    className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                  >
+                    <option value="">Or pick from list…</option>
+                    {visibleMilestones.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.title} ({m.targetDate.slice(0, 7)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               )}
 
               <textarea

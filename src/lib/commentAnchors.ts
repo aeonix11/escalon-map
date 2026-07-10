@@ -36,6 +36,22 @@ export function pixelToTimelineAnchor(
   };
 }
 
+/** Map a viewport click to canvas coordinates (getBoundingClientRect already includes scroll). */
+export function clientPointToTimelineAnchor(
+  clientX: number,
+  clientY: number,
+  canvasRect: DOMRect,
+  centerY: number,
+  baseWidthPerYear: number
+): { pinnedDate: string; hemisphere: HemisphereType } {
+  return pixelToTimelineAnchor(
+    clientX - canvasRect.left,
+    clientY - canvasRect.top,
+    centerY,
+    baseWidthPerYear
+  );
+}
+
 export function buildAnchorLabel(
   milestoneId: string | null | undefined,
   milestoneTitle: string | null | undefined,
