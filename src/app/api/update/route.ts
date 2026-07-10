@@ -96,11 +96,13 @@ export async function POST(req: NextRequest) {
 
     let narrativeIds: string[] | undefined;
     if ("narrativeIds" in data) {
-      narrativeIds = Array.isArray(data.narrativeIds) ? data.narrativeIds : [];
-      await setMilestoneNarratives(id, narrativeIds);
+      const ids = Array.isArray(data.narrativeIds) ? data.narrativeIds : [];
+      narrativeIds = ids;
+      await setMilestoneNarratives(id, ids);
     } else if ("narrativeId" in data) {
-      narrativeIds = data.narrativeId ? [data.narrativeId] : [];
-      await setMilestoneNarratives(id, narrativeIds);
+      const ids = data.narrativeId ? [data.narrativeId] : [];
+      narrativeIds = ids;
+      await setMilestoneNarratives(id, ids);
     }
 
     const [updated] = await db
