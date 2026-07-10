@@ -40,6 +40,8 @@ yarn-error.log*
 *.sqlite3
 escalon.db
 /data/
+*-export.json
+my-map-export.json
 
 # bundled Node.js (installed by install.ps1)
 /tools/node/
@@ -51,5 +53,5 @@ next-env.d.ts
 db-inspect.json
 tsconfig.tsbuildinfo
 
-# drizzle
-drizzle/
+# drizzle generated journal (keep drizzle/*.sql for schema)
+drizzle/meta/

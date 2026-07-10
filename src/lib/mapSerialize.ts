@@ -1,4 +1,4 @@
-import type { Narrative, Milestone, Fragment, Note } from "@/lib/schema";
+import type { Narrative, Fragment, Note, MilestoneWithNarratives } from "@/lib/schema";
 
 function formatNoteLine(n: Note): string {
   const pin =
@@ -12,7 +12,7 @@ function formatNoteLine(n: Note): string {
 
 export function serializeMapContext(
   allNarratives: Narrative[],
-  allMilestones: Milestone[],
+  allMilestones: MilestoneWithNarratives[],
   allFragments: Fragment[],
   allNotes: Note[] = []
 ): string {
@@ -22,7 +22,9 @@ export function serializeMapContext(
   }
   text += "\n=== MILESTONES ===\n";
   for (const m of allMilestones) {
-    text += `[${m.id}] ${m.targetDate} | ${m.hemisphere} | ${m.title}: ${m.description ?? ""} (narrative: ${m.narrativeId ?? "none"}${m.isSpeculative ? ", speculative" : ""})\n`;
+    const narrativeLabel =
+      m.narrativeIds.length > 0 ? m.narrativeIds.join(", ") : "none";
+    text += `[${m.id}] ${m.targetDate} | ${m.hemisphere} | ${m.title}: ${m.description ?? ""} (narratives: ${narrativeLabel}${m.isSpeculative ? ", speculative" : ""})\n`;
   }
   text += "\n=== NOTES ===\n";
   if (allNotes.length === 0) {
@@ -41,4 +43,11 @@ export function serializeMapContext(
 
 export function formatNoteForRetrieval(n: Note): string {
   return `[Note] ${formatNoteLine(n)}`;
+}
+
+export function milestoneMatchesNarrative(
+  m: MilestoneWithNarratives,
+  narrativeId: string
+): boolean {
+  return m.narrativeIds.includes(narrativeId);
 }

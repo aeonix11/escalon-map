@@ -1,12 +1,28 @@
+import { eq } from "drizzle-orm";
 import type { AppDatabase } from "./db";
-import { narratives, milestones, fragments, aiNewsSignals, rssFeeds } from "./schema";
+import {
+  narratives,
+  milestones,
+  milestoneNarratives,
+  fragments,
+  aiNewsSignals,
+  rssFeeds,
+} from "./schema";
 import { nowIso } from "./types";
 
-export async function seedIfEmpty(db: AppDatabase) {
-  const configuredFeeds = await db.select().from(rssFeeds).limit(1);
-  if (configuredFeeds.length > 0) return;
+export async function seedIfEmpty(db: AppDatabase, mapId: string) {
+  const feeds = await db
+    .select()
+    .from(rssFeeds)
+    .where(eq(rssFeeds.mapId, mapId))
+    .limit(1);
+  if (feeds.length > 0) return;
 
-  const existing = await db.select().from(narratives).limit(1);
+  const existing = await db
+    .select()
+    .from(narratives)
+    .where(eq(narratives.mapId, mapId))
+    .limit(1);
   if (existing.length > 0) return;
 
   const n1 = crypto.randomUUID();
@@ -16,6 +32,7 @@ export async function seedIfEmpty(db: AppDatabase) {
   await db.insert(narratives).values([
     {
       id: n1,
+      mapId,
       title: "2026 Wealth Transfer",
       description:
         "A systemic shift in global capital flows, currency devaluation, and wealth redistribution beginning in 2026.",
@@ -24,6 +41,7 @@ export async function seedIfEmpty(db: AppDatabase) {
     },
     {
       id: n2,
+      mapId,
       title: "Beast System Financial Control",
       description:
         "Central bank digital currencies, biometric payment systems, and regulatory frameworks enabling total financial surveillance.",
@@ -32,6 +50,7 @@ export async function seedIfEmpty(db: AppDatabase) {
     },
     {
       id: n3,
+      mapId,
       title: "Middle East Escalation",
       description:
         "Regional conflict expansion, supply chain disruption, and geopolitical realignment in the Levant.",
@@ -46,6 +65,7 @@ export async function seedIfEmpty(db: AppDatabase) {
   await db.insert(fragments).values([
     {
       id: f1,
+      mapId,
       sourceUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
       timestampSeconds: 1485,
       speaker: "Prophet A",
@@ -55,6 +75,7 @@ export async function seedIfEmpty(db: AppDatabase) {
     },
     {
       id: f2,
+      mapId,
       sourceUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
       timestampSeconds: 2100,
       speaker: "Prophet A",
@@ -64,10 +85,16 @@ export async function seedIfEmpty(db: AppDatabase) {
     },
   ]);
 
+  const m1 = crypto.randomUUID();
+  const m2 = crypto.randomUUID();
+  const m3 = crypto.randomUUID();
+  const m4 = crypto.randomUUID();
+  const m5 = crypto.randomUUID();
+
   await db.insert(milestones).values([
     {
-      id: crypto.randomUUID(),
-      narrativeId: n1,
+      id: m1,
+      mapId,
       title: "Wealth Transfer Window Opens",
       description: "Initial capital flow shift predicted for mid-2026.",
       targetDate: "2026-06-15",
@@ -78,8 +105,8 @@ export async function seedIfEmpty(db: AppDatabase) {
       createdAt: nowIso(),
     },
     {
-      id: crypto.randomUUID(),
-      narrativeId: n2,
+      id: m2,
+      mapId,
       title: "GENIUS Act Advances",
       description: "Stablecoin regulatory framework passes committee.",
       targetDate: "2026-03-01",
@@ -90,8 +117,8 @@ export async function seedIfEmpty(db: AppDatabase) {
       createdAt: nowIso(),
     },
     {
-      id: crypto.randomUUID(),
-      narrativeId: n2,
+      id: m3,
+      mapId,
       title: "CBDC Pilot Expansion",
       description: "Central bank digital currency trials expand to 12 nations.",
       targetDate: "2027-09-01",
@@ -102,8 +129,8 @@ export async function seedIfEmpty(db: AppDatabase) {
       createdAt: nowIso(),
     },
     {
-      id: crypto.randomUUID(),
-      narrativeId: n3,
+      id: m4,
+      mapId,
       title: "Regional Conflict Escalation",
       description: "Supply chain disruption across Red Sea corridor.",
       targetDate: "2026-11-01",
@@ -114,8 +141,8 @@ export async function seedIfEmpty(db: AppDatabase) {
       createdAt: nowIso(),
     },
     {
-      id: crypto.randomUUID(),
-      narrativeId: n1,
+      id: m5,
+      mapId,
       title: "Market Correction Peak",
       description: "Predicted correction window aligning with wealth transfer.",
       targetDate: "2028-03-01",
@@ -127,9 +154,18 @@ export async function seedIfEmpty(db: AppDatabase) {
     },
   ]);
 
+  await db.insert(milestoneNarratives).values([
+    { milestoneId: m1, narrativeId: n1 },
+    { milestoneId: m2, narrativeId: n2 },
+    { milestoneId: m3, narrativeId: n2 },
+    { milestoneId: m4, narrativeId: n3 },
+    { milestoneId: m5, narrativeId: n1 },
+  ]);
+
   await db.insert(aiNewsSignals).values([
     {
       id: crypto.randomUUID(),
+      mapId,
       title: "Senate Committee Advances Digital Asset Framework",
       summary:
         "The CLARITY Act moves to full Senate vote, establishing federal oversight of digital asset markets and stablecoin issuers.",
@@ -141,6 +177,7 @@ export async function seedIfEmpty(db: AppDatabase) {
     },
     {
       id: crypto.randomUUID(),
+      mapId,
       title: "Global CBDC Coalition Announces 2027 Timeline",
       summary:
         "Twelve central banks commit to interoperable digital currency standards by Q3 2027.",

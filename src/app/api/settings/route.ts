@@ -1,81 +1,114 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { eq } from "drizzle-orm";
+import { maps, profiles } from "@/lib/schema";
+import { getDb } from "@/lib/db";
 import {
-  getDefaultMapId,
-  readRegistry,
-  renameMap,
-  removeMap,
-} from "@/lib/maps";
-import {
-  applySettingsToEnv,
-  maskApiKey,
-  readSettings,
-  writeSettings,
-} from "@/lib/settings";
-import { invalidateMapCache } from "@/lib/db";
+  bootstrapUser,
+  requireSessionUser,
+} from "@/lib/auth";
+import { applySettingsToEnv, maskApiKey, readSettings, writeSettings } from "@/lib/settings";
 
 export async function GET() {
   applySettingsToEnv(readSettings());
-  const settings = readSettings();
-  const cookieStore = await cookies();
-  const activeMapId =
-    cookieStore.get("escalon-active-map")?.value ?? settings.activeMapId;
+  const user = await requireSessionUser();
+  const map = await bootstrapUser(user);
+  const db = getDb();
 
-  const registry = readRegistry();
-  const activeEntry =
-    registry.maps.find((m) => m.id === activeMapId) ?? registry.maps[0];
+  const [profile] = await db
+    .select()
+    .from(profiles)
+    .where(eq(profiles.id, user.id))
+    .limit(1);
+
+  const settings = readSettings();
 
   return NextResponse.json({
-    activeMapId: activeEntry.id,
-    maps: registry.maps.map((m) => ({
-      id: m.id,
-      name: m.name,
-      editable: m.editable,
-      ownerLabel: m.ownerLabel ?? null,
-      kind: m.kind,
-    })),
+    activeMapId: map.id,
+    maps: [
+      {
+        id: map.id,
+        name: map.name,
+        editable: true,
+        ownerLabel: null,
+        kind: "database" as const,
+        visibility: map.visibility,
+        shareSlug: map.shareSlug,
+      },
+    ],
     apiKeys: {
-      anthropicConfigured: Boolean(settings.anthropicApiKey),
-      voyageConfigured: Boolean(settings.voyageApiKey),
+      anthropicConfigured: Boolean(
+        settings.anthropicApiKey || process.env.ANTHROPIC_API_KEY
+      ),
+      voyageConfigured: Boolean(
+        settings.voyageApiKey || process.env.VOYAGE_API_KEY
+      ),
       anthropicMasked: maskApiKey(settings.anthropicApiKey),
       voyageMasked: maskApiKey(settings.voyageApiKey),
     },
-    readOnly: !activeEntry.editable,
+    readOnly: false,
+    user: {
+      id: user.id,
+      email: user.email,
+      displayName: profile?.displayName ?? user.email?.split("@")[0],
+    },
+    narrativeFocusMode: profile?.narrativeFocusMode ?? "fade",
   });
 }
 
 export async function PUT(req: NextRequest) {
+  const user = await requireSessionUser();
+  const map = await bootstrapUser(user);
+  const db = getDb();
   const body = await req.json();
   const current = readSettings();
-  const next = writeSettings({
-    activeMapId: body.activeMapId ?? current.activeMapId,
-    anthropicApiKey:
-      body.anthropicApiKey !== undefined
-        ? body.anthropicApiKey
-        : current.anthropicApiKey,
-    voyageApiKey:
-      body.voyageApiKey !== undefined ? body.voyageApiKey : current.voyageApiKey,
-  });
 
-  const cookieStore = await cookies();
-  const activeMapId = body.activeMapId ?? next.activeMapId ?? getDefaultMapId();
-  cookieStore.set("escalon-active-map", activeMapId, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-  });
-
-  if (body.mapName && body.renameMapId) {
-    renameMap(body.renameMapId, body.mapName);
+  if (body.anthropicApiKey !== undefined || body.voyageApiKey !== undefined) {
+    writeSettings({
+      activeMapId: map.id,
+      anthropicApiKey:
+        body.anthropicApiKey !== undefined
+          ? body.anthropicApiKey
+          : current.anthropicApiKey,
+      voyageApiKey:
+        body.voyageApiKey !== undefined
+          ? body.voyageApiKey
+          : current.voyageApiKey,
+      deepAnalysisQuickPrompt: current.deepAnalysisQuickPrompt,
+      deepAnalysisDeepPrompt: current.deepAnalysisDeepPrompt,
+    });
   }
 
-  if (body.removeMapId) {
-    const removed = removeMap(body.removeMapId);
-    if (removed) invalidateMapCache(body.removeMapId);
+  const mapUpdates: Partial<{
+    name: string;
+    visibility: "private" | "public";
+  }> = {};
+
+  if (body.mapName) {
+    mapUpdates.name = body.mapName.trim();
+  }
+  if (body.visibility === "private" || body.visibility === "public") {
+    mapUpdates.visibility = body.visibility;
   }
 
-  if (body.activeMapId && body.activeMapId !== current.activeMapId) {
-    invalidateMapCache(body.activeMapId);
+  if (Object.keys(mapUpdates).length > 0) {
+    await db
+      .update(maps)
+      .set({ ...mapUpdates, updatedAt: new Date().toISOString() })
+      .where(eq(maps.id, map.id));
+  }
+
+  if (body.narrativeFocusMode === "fade" || body.narrativeFocusMode === "hide") {
+    await db
+      .update(profiles)
+      .set({ narrativeFocusMode: body.narrativeFocusMode })
+      .where(eq(profiles.id, user.id));
+  }
+
+  if (body.displayName?.trim()) {
+    await db
+      .update(profiles)
+      .set({ displayName: body.displayName.trim() })
+      .where(eq(profiles.id, user.id));
   }
 
   return GET();

@@ -1,47 +1,57 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import type { Map } from "@/lib/schema";
+import type { AppDatabase } from "@/lib/db";
+import { getDb } from "@/lib/db";
 import {
-  getDefaultMapId,
-  getMapEntry,
-  readRegistry,
-  type MapEntry,
-} from "@/lib/maps";
-import { initDb, isMapEditable, persistDb, type AppDatabase } from "@/lib/db";
+  bootstrapUser,
+  getMapByShareSlug,
+  getSessionUser,
+  requireSessionUser,
+} from "@/lib/auth";
 import { applySettingsToEnv, readSettings } from "@/lib/settings";
 
 export interface MapContext {
   mapId: string;
-  entry: MapEntry;
+  map: Map;
   db: AppDatabase;
   editable: boolean;
+  userId: string | null;
 }
 
-export async function resolveMapContext(): Promise<MapContext> {
+export async function resolveOwnerMapContext(): Promise<MapContext> {
   applySettingsToEnv(readSettings());
-  const cookieStore = await cookies();
-  const settings = readSettings();
-  const mapId =
-    cookieStore.get("escalon-active-map")?.value ??
-    settings.activeMapId ??
-    getDefaultMapId();
+  const user = await requireSessionUser();
+  const map = await bootstrapUser(user);
+  return {
+    mapId: map.id,
+    map,
+    db: getDb(),
+    editable: true,
+    userId: user.id,
+  };
+}
 
-  const entry = getMapEntry(mapId) ?? readRegistry().maps[0];
-  const db = await initDb(entry.id);
-  const editable = isMapEditable(entry.id);
-
-  return { mapId: entry.id, entry, db, editable };
+export async function resolvePublicMapContext(
+  shareSlug: string
+): Promise<MapContext | null> {
+  const map = await getMapByShareSlug(shareSlug);
+  if (!map || map.visibility !== "public") return null;
+  return {
+    mapId: map.id,
+    map,
+    db: getDb(),
+    editable: false,
+    userId: (await getSessionUser())?.id ?? null,
+  };
 }
 
 export function readOnlyResponse() {
   return NextResponse.json(
-    {
-      error:
-        "This map is view-only. Switch to My Map in Settings to make changes.",
-    },
+    { error: "This map is view-only." },
     { status: 403 }
   );
 }
 
-export function persistIfEditable(ctx: MapContext) {
-  if (ctx.editable) persistDb(ctx.mapId);
+export function unauthorizedResponse() {
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }

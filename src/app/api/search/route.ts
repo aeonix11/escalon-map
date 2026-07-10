@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 import { fragments, narratives, milestones } from "@/lib/schema";
 import {
   bufferToEmbedding,
   cosineSimilarity,
   embedQuery,
 } from "@/lib/voyage";
-import { resolveMapContext } from "@/lib/mapContext";
+import { resolveOwnerMapContext } from "@/lib/mapContext";
+import { fetchMapPayload } from "@/lib/mapData";
 
 export async function POST(req: NextRequest) {
-  const ctx = await resolveMapContext();
+  const ctx = await resolveOwnerMapContext();
   const db = ctx.db;
   const { query, type } = await req.json();
 
@@ -18,7 +20,10 @@ export async function POST(req: NextRequest) {
   }
 
   if (type === "fragments") {
-    const allFragments = await db.select().from(fragments);
+    const allFragments = await db
+      .select()
+      .from(fragments)
+      .where(eq(fragments.mapId, ctx.mapId));
     const results = allFragments
       .filter((f) => f.embedding)
       .map((f) => ({
@@ -35,7 +40,10 @@ export async function POST(req: NextRequest) {
   }
 
   if (type === "narratives") {
-    const allNarratives = await db.select().from(narratives);
+    const allNarratives = await db
+      .select()
+      .from(narratives)
+      .where(eq(narratives.mapId, ctx.mapId));
     const results = allNarratives
       .filter((n) => n.embedding)
       .map((n) => ({
@@ -51,8 +59,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ results });
   }
 
-  const allMilestones = await db.select().from(milestones);
-  const milestoneResults = allMilestones
+  const payload = await fetchMapPayload(ctx.mapId);
+  const milestoneResults = payload.milestones
     .map((m) => ({
       item: m,
       score: 0,

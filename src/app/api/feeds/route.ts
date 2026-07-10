@@ -4,20 +4,19 @@ import { rssFeeds } from "@/lib/schema";
 import { nowIso } from "@/lib/types";
 import { pollFeed } from "@/lib/feedService";
 import { isSafePublicHttpUrl } from "@/lib/urlSafety";
-import {
-  persistIfEditable,
-  readOnlyResponse,
-  resolveMapContext,
-} from "@/lib/mapContext";
+import { readOnlyResponse, resolveOwnerMapContext } from "@/lib/mapContext";
 
 export async function GET() {
-  const ctx = await resolveMapContext();
-  const feeds = await ctx.db.select().from(rssFeeds);
+  const ctx = await resolveOwnerMapContext();
+  const feeds = await ctx.db
+    .select()
+    .from(rssFeeds)
+    .where(eq(rssFeeds.mapId, ctx.mapId));
   return NextResponse.json(feeds);
 }
 
 export async function POST(req: NextRequest) {
-  const ctx = await resolveMapContext();
+  const ctx = await resolveOwnerMapContext();
   if (!ctx.editable) return readOnlyResponse();
 
   const db = ctx.db;
@@ -58,13 +57,13 @@ export async function POST(req: NextRequest) {
     const id = crypto.randomUUID();
     await db.insert(rssFeeds).values({
       id,
+      mapId: ctx.mapId,
       url,
       label,
       pollIntervalMinutes: pollIntervalMinutes ?? 60,
       lastFetched: null,
       createdAt: nowIso(),
     });
-    persistIfEditable(ctx);
     return NextResponse.json({ id });
   }
 
@@ -74,7 +73,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "feedId required" }, { status: 400 });
     }
     await db.delete(rssFeeds).where(eq(rssFeeds.id, feedId));
-    persistIfEditable(ctx);
     return NextResponse.json({ ok: true });
   }
 
@@ -90,18 +88,20 @@ export async function POST(req: NextRequest) {
       .where(eq(rssFeeds.id, feedId))
       .limit(1);
 
-    if (!feed) {
+    if (!feed || feed.mapId !== ctx.mapId) {
       return NextResponse.json({ error: "Feed not found" }, { status: 404 });
     }
 
     const result = await pollFeed(db, feed, force ?? true);
-    persistIfEditable(ctx);
     return NextResponse.json(result);
   }
 
   if (action === "fetch-all") {
     const force = body.force ?? false;
-    const feeds = await db.select().from(rssFeeds);
+    const feeds = await db
+      .select()
+      .from(rssFeeds)
+      .where(eq(rssFeeds.mapId, ctx.mapId));
     const results: Array<{
       feedId: string;
       label: string;
@@ -121,7 +121,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    persistIfEditable(ctx);
     const totalAdded = results.reduce((sum, r) => sum + r.added, 0);
     return NextResponse.json({ totalAdded, results });
   }

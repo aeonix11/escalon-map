@@ -1,4 +1,4 @@
-import type { Milestone, Narrative, Fragment, Note, MilestoneSuggestion } from "@/lib/schema";
+import type { MilestoneWithNarratives, Narrative, Fragment, Note, MilestoneSuggestion } from "@/lib/schema";
 
 export const TIMELINE_START_YEAR = 2012;
 export const TIMELINE_END_YEAR = 2075;
@@ -148,11 +148,12 @@ export interface VisualNote extends Note {
   lane: number;
 }
 
-export interface VisualMilestone extends Milestone {
+export interface VisualMilestone extends MilestoneWithNarratives {
   leftPixel: number;
   lane: number;
   opacity: number;
   narrativeColor?: string;
+  narrativeColors?: string[];
   fuzzyLeftPixel?: number;
   fuzzyWidth?: number;
   isAiSuggested?: boolean;
@@ -160,18 +161,19 @@ export interface VisualMilestone extends Milestone {
   suggestionReasoning?: string | null;
 }
 
-export interface MilestoneWithNarrative extends Milestone {
+export interface MilestoneWithNarrative extends MilestoneWithNarratives {
   narrative?: Narrative | null;
   linkedFragment?: Fragment | null;
 }
 
 export interface ExportData {
-  version: 1;
+  version: 1 | 2;
   exportedAt: string;
   narratives: Narrative[];
   fragments: Fragment[];
   fragmentNarratives: { fragmentId: string; narrativeId: string }[];
-  milestones: Milestone[];
+  milestoneNarratives?: { milestoneId: string; narrativeId: string }[];
+  milestones: (Milestone | MilestoneWithNarratives)[];
   milestoneSuggestions?: MilestoneSuggestion[];
   aiNewsSignals: import("@/lib/schema").AiNewsSignal[];
   rssFeeds?: import("@/lib/schema").RssFeed[];

@@ -1,35 +1,26 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import {
-  narratives,
-  milestones,
-  aiNewsSignals,
-} from "@/lib/schema";
-import {
-  streamSignalScan,
-  parseScanResults,
-} from "@/lib/anthropic";
-import {
-  persistIfEditable,
-  readOnlyResponse,
-  resolveMapContext,
-} from "@/lib/mapContext";
+import { aiNewsSignals } from "@/lib/schema";
+import { streamSignalScan, parseScanResults } from "@/lib/anthropic";
+import { readOnlyResponse, resolveOwnerMapContext } from "@/lib/mapContext";
+import { fetchMapPayload } from "@/lib/mapData";
 
 export async function POST() {
-  const ctx = await resolveMapContext();
+  const ctx = await resolveOwnerMapContext();
   if (!ctx.editable) return readOnlyResponse();
 
   const db = ctx.db;
+  const payload = await fetchMapPayload(ctx.mapId);
 
-  const allNarratives = await db.select().from(narratives);
-  const allMilestones = await db.select().from(milestones);
   const pendingSignals = await db
     .select()
     .from(aiNewsSignals)
-    .where(eq(aiNewsSignals.status, "PENDING"))
+    .where(eq(aiNewsSignals.mapId, ctx.mapId))
     .limit(50);
 
-  if (pendingSignals.length === 0) {
+  const pending = pendingSignals.filter((s) => s.status === "PENDING");
+
+  if (pending.length === 0) {
     return NextResponse.json(
       { error: "No pending signals to scan" },
       { status: 400 }
@@ -44,18 +35,18 @@ export async function POST() {
     let fullText = "";
     try {
       const textStream = await streamSignalScan(
-        allNarratives.map((n) => ({
+        payload.narratives.map((n) => ({
           id: n.id,
           title: n.title,
           description: n.description,
         })),
-        allMilestones.map((m) => ({
+        payload.milestones.map((m) => ({
           title: m.title,
           description: m.description,
           targetDate: m.targetDate,
           hemisphere: m.hemisphere,
         })),
-        pendingSignals.map((s) => ({
+        pending.map((s) => ({
           id: s.id,
           title: s.title,
           summary: s.summary,
@@ -72,7 +63,7 @@ export async function POST() {
 
       for (const result of results) {
         if (!result.matched) continue;
-        const signal = pendingSignals.find((s) => s.id === result.signalId);
+        const signal = pending.find((s) => s.id === result.signalId);
         if (!signal) continue;
 
         await db
@@ -86,7 +77,6 @@ export async function POST() {
         updated += 1;
       }
 
-      persistIfEditable(ctx);
       await writer.write(
         encoder.encode(`\n\n---\nScan complete. ${updated} signal(s) marked as relevant.`)
       );

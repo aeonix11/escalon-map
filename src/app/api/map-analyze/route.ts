@@ -1,12 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  narratives,
-  milestones,
-  fragments,
-  fragmentNarratives,
-  milestoneSuggestions,
-  notes,
-} from "@/lib/schema";
+import { eq } from "drizzle-orm";
+import { milestoneSuggestions } from "@/lib/schema";
 import {
   streamMapDeepAnalysis,
   getClaudeModelId,
@@ -22,12 +16,10 @@ import {
 } from "@/lib/mapAnalysis";
 import { saveDeepAnalysisRun } from "@/lib/deepAnalysisHistory";
 import { resolvePromptTemplate } from "@/lib/deepAnalysisPrompts";
-import { serializeMapContext } from "@/lib/mapSerialize";
+import { serializeMapContext, milestoneMatchesNarrative } from "@/lib/mapSerialize";
 import { readSettings } from "@/lib/settings";
-import {
-  persistIfEditable,
-  resolveMapContext,
-} from "@/lib/mapContext";
+import { resolveOwnerMapContext } from "@/lib/mapContext";
+import { fetchMapPayload } from "@/lib/mapData";
 
 interface AnalyzeRequestBody {
   mode?: DeepAnalysisMode;
@@ -37,13 +29,13 @@ interface AnalyzeRequestBody {
 }
 
 export async function POST(req: NextRequest) {
-  const ctx = await resolveMapContext();
+  const ctx = await resolveOwnerMapContext();
 
   let body: AnalyzeRequestBody = {};
   try {
     body = (await req.json()) as AnalyzeRequestBody;
   } catch {
-    // empty body is fine — defaults to quick mode
+    // empty body is fine
   }
 
   const mode: DeepAnalysisMode = body.mode === "deep" ? "deep" : "quick";
@@ -60,42 +52,34 @@ export async function POST(req: NextRequest) {
         : 0;
   const scopeNarrativeId = body.narrativeId?.trim() || null;
 
-  const [
-    allNarratives,
-    allMilestones,
-    allFragments,
-    allNotes,
-    allFragmentNarratives,
-  ] = await Promise.all([
-    ctx.db.select().from(narratives),
-    ctx.db.select().from(milestones),
-    ctx.db.select().from(fragments),
-    ctx.db.select().from(notes),
-    ctx.db.select().from(fragmentNarratives),
-  ]);
+  const payload = await fetchMapPayload(ctx.mapId);
 
-  let filteredNarratives = allNarratives;
-  let filteredMilestones = allMilestones;
-  let filteredFragments = allFragments;
+  let filteredNarratives = payload.narratives;
+  let filteredMilestones = payload.milestones;
+  let filteredFragments = payload.fragments;
 
   if (scopeNarrativeId) {
-    filteredNarratives = allNarratives.filter((n) => n.id === scopeNarrativeId);
-    filteredMilestones = allMilestones.filter(
-      (m) => m.narrativeId === scopeNarrativeId
+    filteredNarratives = payload.narratives.filter(
+      (n) => n.id === scopeNarrativeId
+    );
+    filteredMilestones = payload.milestones.filter((m) =>
+      milestoneMatchesNarrative(m, scopeNarrativeId)
     );
     const linkedFragmentIds = new Set(
-      allFragmentNarratives
+      payload.fragmentNarratives
         .filter((fn) => fn.narrativeId === scopeNarrativeId)
         .map((fn) => fn.fragmentId)
     );
-    filteredFragments = allFragments.filter((f) => linkedFragmentIds.has(f.id));
+    filteredFragments = payload.fragments.filter((f) =>
+      linkedFragmentIds.has(f.id)
+    );
   }
 
   const mapContext = serializeMapContext(
     filteredNarratives,
     filteredMilestones,
     filteredFragments,
-    allNotes
+    payload.notes
   );
 
   const searchLog: SearchResultLogEntry[] = [];
@@ -136,8 +120,6 @@ export async function POST(req: NextRequest) {
         await writer.write(encoder.encode(chunk));
       }
 
-      console.log(`[map-analyze] stream done, fullText length=${fullText.length}, mode=${mode}, model=${model}`);
-
       const parsed = parseMapDeepAnalysis(fullText.replace(DEEP_STATUS_MARKER, ""));
       let suggestions = parsed.suggestions;
       if (mode === "deep" && searchLog.length > 0) {
@@ -150,6 +132,7 @@ export async function POST(req: NextRequest) {
       if (ctx.editable && parsed.analysis.trim()) {
         await saveDeepAnalysisRun(
           ctx.db,
+          ctx.mapId,
           parsed.analysis,
           suggestions,
           modelUsed,
@@ -159,31 +142,30 @@ export async function POST(req: NextRequest) {
             scopeNarrativeId,
           }
         );
-        persistIfEditable(ctx);
       }
 
-      if (suggestions.length > 0) {
-        if (ctx.editable) {
-          await ctx.db.delete(milestoneSuggestions);
-          const now = new Date().toISOString();
-          for (const item of suggestions) {
-            await ctx.db.insert(milestoneSuggestions).values({
-              id: crypto.randomUUID(),
-              narrativeId: item.narrativeId,
-              title: item.title,
-              description: item.description,
-              targetDate: item.targetDate,
-              isFuzzy: item.isFuzzy,
-              fuzzyRangeMonths: item.fuzzyRangeMonths,
-              hemisphere: item.hemisphere,
-              reasoning: item.reasoning || null,
-              sourcesJson: JSON.stringify(item.sources ?? []),
-              tier: item.tier ?? "inferred",
-              confirmsMilestoneId: item.confirmsMilestoneId ?? null,
-              createdAt: now,
-            });
-          }
-          persistIfEditable(ctx);
+      if (suggestions.length > 0 && ctx.editable) {
+        await ctx.db
+          .delete(milestoneSuggestions)
+          .where(eq(milestoneSuggestions.mapId, ctx.mapId));
+        const now = new Date().toISOString();
+        for (const item of suggestions) {
+          await ctx.db.insert(milestoneSuggestions).values({
+            id: crypto.randomUUID(),
+            mapId: ctx.mapId,
+            narrativeId: item.narrativeId,
+            title: item.title,
+            description: item.description,
+            targetDate: item.targetDate,
+            isFuzzy: item.isFuzzy,
+            fuzzyRangeMonths: item.fuzzyRangeMonths,
+            hemisphere: item.hemisphere,
+            reasoning: item.reasoning || null,
+            sourcesJson: JSON.stringify(item.sources ?? []),
+            tier: item.tier ?? "inferred",
+            confirmsMilestoneId: item.confirmsMilestoneId ?? null,
+            createdAt: now,
+          });
         }
         const healthNote =
           parsed.health.length > 0
@@ -195,17 +177,12 @@ export async function POST(req: NextRequest) {
             : "";
         await writer.write(
           encoder.encode(
-            `\n\n---\nParsed ${suggestions.length} timeline suggestion(s).${healthNote}${searchNote}${
-              ctx.editable
-                ? " They are now on your timeline as AI-suggested boxes."
-                : ""
-            }`
+            `\n\n---\nParsed ${suggestions.length} timeline suggestion(s).${healthNote}${searchNote} They are now on your timeline as AI-suggested boxes.`
           )
         );
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Deep analysis failed";
-      console.error("[map-analyze] stream error:", msg);
       await writer.write(encoder.encode(`\n\nError: ${msg}`));
     } finally {
       await writer.close();

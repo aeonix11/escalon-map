@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Milestone, Narrative, MilestoneSuggestion } from "@/lib/schema";
+import type { Narrative, MilestoneSuggestion, MilestoneWithNarratives } from "@/lib/schema";
 import {
   CARD_WIDTH,
   LANE_GAP,
@@ -9,7 +9,7 @@ import {
   type ZoomLevel,
 } from "@/lib/types";
 
-function suggestionToLayoutItem(s: MilestoneSuggestion): Milestone & {
+function suggestionToLayoutItem(s: MilestoneSuggestion): MilestoneWithNarratives & {
   isAiSuggested: true;
   suggestionId: string;
   suggestionReasoning: string | null;
@@ -18,7 +18,8 @@ function suggestionToLayoutItem(s: MilestoneSuggestion): Milestone & {
 } {
   return {
     id: s.id,
-    narrativeId: s.narrativeId,
+    mapId: s.mapId,
+    narrativeIds: s.narrativeId ? [s.narrativeId] : [],
     title: s.title,
     description: s.description,
     targetDate: s.targetDate,
@@ -35,8 +36,15 @@ function suggestionToLayoutItem(s: MilestoneSuggestion): Milestone & {
   };
 }
 
+function milestoneMatchesActive(
+  m: MilestoneWithNarratives,
+  activeNarrativeId: string
+): boolean {
+  return m.narrativeIds.includes(activeNarrativeId);
+}
+
 export function useTimelineLayout(
-  milestones: Milestone[],
+  milestones: MilestoneWithNarratives[],
   suggestions: MilestoneSuggestion[],
   narratives: Narrative[],
   zoomScale: number,
@@ -72,10 +80,18 @@ export function useTimelineLayout(
       const yearFraction = parseTargetDateFraction(m.targetDate);
       const leftPixel = yearFraction * baseWidthPerYear;
 
+      const matches =
+        !activeNarrativeId ||
+        milestoneMatchesActive(m, activeNarrativeId);
+
       let opacity = 1.0;
-      if (activeNarrativeId && m.narrativeId !== activeNarrativeId) {
+      if (activeNarrativeId && !matches) {
         opacity = m.isAiSuggested ? 0.55 : 0.2;
       }
+
+      const narrativeColors = m.narrativeIds
+        .map((id) => narrativeColorMap.get(id))
+        .filter(Boolean) as string[];
 
       const occupancyMap =
         m.hemisphere === "UPPER_PROPHETIC"
@@ -109,9 +125,8 @@ export function useTimelineLayout(
         leftPixel,
         lane: assignedLane,
         opacity,
-        narrativeColor: m.narrativeId
-          ? narrativeColorMap.get(m.narrativeId)
-          : undefined,
+        narrativeColor: narrativeColors[0],
+        narrativeColors,
         fuzzyLeftPixel,
         fuzzyWidth,
         suggestionId: m.isAiSuggested ? m.suggestionId : undefined,

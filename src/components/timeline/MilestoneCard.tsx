@@ -15,8 +15,14 @@ export default function MilestoneCard({
   zoomLevel,
   onClick,
 }: MilestoneCardProps) {
-  const color =
-    data.narrativeColor ?? (variant === "prophetic" ? "#f59e0b" : "#0ea5e9");
+  const colors =
+    data.narrativeColors && data.narrativeColors.length > 0
+      ? data.narrativeColors
+      : [
+          data.narrativeColor ??
+            (variant === "prophetic" ? "#f59e0b" : "#0ea5e9"),
+        ];
+  const color = colors[0];
   const isDecadal = zoomLevel === "DECADAL";
   const showDescription = zoomLevel === "SEASONAL" && data.description;
   const isSuggested = Boolean(data.isAiSuggested);
@@ -38,17 +44,40 @@ export default function MilestoneCard({
         borderColor: isSuggested || isSpeculative ? undefined : color + "55",
       }}
     >
-      {!isSuggested && !isSpeculative && (
+      {!isSuggested && !isSpeculative && colors.length === 1 && (
         <div
           className="absolute left-0 top-0 h-1 w-full rounded-t-lg"
           style={{ backgroundColor: color }}
         />
+      )}
+      {!isSuggested && !isSpeculative && colors.length > 1 && (
+        <div className="absolute left-0 top-0 flex h-1 w-full overflow-hidden rounded-t-lg">
+          {colors.map((c, i) => (
+            <div
+              key={`${c}-${i}`}
+              className="h-full flex-1"
+              style={{ backgroundColor: c }}
+            />
+          ))}
+        </div>
       )}
       {isSpeculative && (
         <div
           className="absolute left-0 top-0 h-1 w-full rounded-t-lg border-b border-dashed border-amber-400/60"
           style={{ backgroundColor: color + "66" }}
         />
+      )}
+      {colors.length > 0 && !isSuggested && !isSpeculative && (
+        <div className="absolute right-1 top-1 flex gap-0.5">
+          {colors.map((c, i) => (
+            <span
+              key={`tag-${c}-${i}`}
+              className="h-2 w-2 rounded-full ring-1 ring-white/80"
+              style={{ backgroundColor: c }}
+              title="Narrative tag"
+            />
+          ))}
+        </div>
       )}
       {isSpeculative && (
         <span

@@ -1,141 +1,199 @@
-import type { Database as SqlJsDatabase } from "sql.js";
-import type { AppDatabase } from "./db";
+import { eq } from "drizzle-orm";
+import type { AppDatabase } from "@/lib/db";
 import {
   narratives,
   milestones,
   fragments,
   fragmentNarratives,
+  milestoneNarratives,
   aiNewsSignals,
   rssFeeds,
   notes,
-} from "./schema";
-import type { ExportData } from "./types";
+  milestoneSuggestions,
+} from "@/lib/schema";
+import type { ExportData } from "@/lib/types";
 
-export async function loadExportIntoDb(db: AppDatabase, data: ExportData) {
-  await db.delete(aiNewsSignals);
-  await db.delete(notes);
-  await db.delete(milestones);
-  await db.delete(fragmentNarratives);
-  await db.delete(fragments);
-  await db.delete(rssFeeds);
-  await db.delete(narratives);
+type MilestoneNarrativeRow = {
+  milestoneId: string;
+  narrativeId: string;
+};
 
-  for (const n of data.narratives ?? []) {
-    await db.insert(narratives).values(n);
-  }
-  for (const f of data.fragments ?? []) {
-    await db.insert(fragments).values(f);
-  }
-  for (const fn of data.fragmentNarratives ?? []) {
-    await db.insert(fragmentNarratives).values(fn);
-  }
-  for (const m of data.milestones ?? []) {
-    await db.insert(milestones).values(m);
-  }
-  for (const s of data.aiNewsSignals ?? []) {
-    await db.insert(aiNewsSignals).values(s);
-  }
-  for (const f of data.rssFeeds ?? []) {
-    await db.insert(rssFeeds).values(f);
-  }
-  for (const n of data.notes ?? []) {
-    await db.insert(notes).values(n);
-  }
-}
+/** Merge junction rows + legacy per-milestone narrative fields (v1 SQLite exports). */
+export function collectMilestoneNarrativeRows(
+  data: ExportData
+): MilestoneNarrativeRow[] {
+  const rows = new Map<string, MilestoneNarrativeRow>();
 
-export function loadExportIntoSqlite(sqlite: SqlJsDatabase, data: ExportData) {
-  const insert = (sql: string, rows: Record<string, unknown>[]) => {
-    if (rows.length === 0) return;
-    const keys = Object.keys(rows[0]);
-    const placeholders = keys.map(() => "?").join(", ");
-    const stmt = sqlite.prepare(
-      `INSERT INTO ${sql} (${keys.join(", ")}) VALUES (${placeholders})`
-    );
-    for (const row of rows) {
-      stmt.run(keys.map((k) => row[k]));
+  const add = (milestoneId: unknown, narrativeId: unknown) => {
+    if (typeof milestoneId !== "string" || typeof narrativeId !== "string") {
+      return;
     }
-    stmt.free();
+    if (!milestoneId || !narrativeId) return;
+    rows.set(`${milestoneId}:${narrativeId}`, { milestoneId, narrativeId });
   };
 
-  const narrativeRows = (data.narratives ?? []).map((n) => ({
-    id: n.id,
-    title: n.title,
-    description: n.description,
-    color_hex: n.colorHex,
-    embedding: n.embedding,
-    created_at: n.createdAt,
-  }));
-  const fragmentRows = (data.fragments ?? []).map((f) => ({
-    id: f.id,
-    source_url: f.sourceUrl,
-    timestamp_seconds: f.timestampSeconds,
-    speaker: f.speaker,
-    raw_text: f.rawText,
-    embedding: f.embedding,
-    created_at: f.createdAt,
-  }));
-  const milestoneRows = (data.milestones ?? []).map((m) => ({
-    id: m.id,
-    narrative_id: m.narrativeId,
-    title: m.title,
-    description: m.description,
-    target_date: m.targetDate,
-    is_fuzzy: m.isFuzzy ? 1 : 0,
-    fuzzy_range_months: m.fuzzyRangeMonths,
-    is_personal: m.isPersonal ? 1 : 0,
-    is_speculative: m.isSpeculative ? 1 : 0,
-    hemisphere: m.hemisphere,
-    linked_fragment_id: m.linkedFragmentId,
-    created_at: m.createdAt,
-  }));
-  const noteRows = (data.notes ?? []).map((n) => ({
-    id: n.id,
-    title: n.title,
-    content: n.content,
-    is_personal: n.isPersonal ? 1 : 0,
-    pinned_date: n.pinnedDate,
-    hemisphere: n.hemisphere,
-    created_at: n.createdAt,
-    updated_at: n.updatedAt,
-  }));
+  for (const row of data.milestoneNarratives ?? []) {
+    const legacy = row as MilestoneNarrativeRow & {
+      milestone_id?: string;
+      narrative_id?: string;
+    };
+    add(
+      legacy.milestoneId ?? legacy.milestone_id,
+      legacy.narrativeId ?? legacy.narrative_id
+    );
+  }
 
-  insert("narratives", narrativeRows);
-  insert("fragments", fragmentRows);
-  insert(
-    "fragment_narratives",
-    (data.fragmentNarratives ?? []).map((fn) => ({
-      fragment_id: fn.fragmentId,
-      narrative_id: fn.narrativeId,
-    }))
-  );
-  insert("milestones", milestoneRows);
-  insert(
-    "ai_news_signals",
-    (data.aiNewsSignals ?? []).map((s) => ({
-      id: s.id,
-      title: s.title,
-      summary: s.summary,
-      source_name: s.sourceName,
-      url: s.url,
-      published_at: s.publishedAt,
-      embedding: s.embedding,
-      status: s.status,
-      matched_narrative_id: s.matchedNarrativeId,
-      reasoning_note: s.reasoningNote,
-      feed_id: s.feedId,
-      created_at: s.createdAt,
-    }))
-  );
-  insert(
-    "rss_feeds",
-    (data.rssFeeds ?? []).map((f) => ({
-      id: f.id,
-      url: f.url,
-      label: f.label,
-      poll_interval_minutes: f.pollIntervalMinutes,
-      last_fetched: f.lastFetched,
-      created_at: f.createdAt,
-    }))
-  );
-  insert("notes", noteRows);
+  for (const m of data.milestones ?? []) {
+    const legacy = m as typeof m & {
+      narrativeIds?: string[];
+      narrativeId?: string | null;
+      narrative_id?: string | null;
+    };
+    const ids =
+      legacy.narrativeIds ??
+      (legacy.narrativeId
+        ? [legacy.narrativeId]
+        : legacy.narrative_id
+          ? [legacy.narrative_id]
+          : []);
+    for (const narrativeId of ids) {
+      add(m.id, narrativeId);
+    }
+  }
+
+  return [...rows.values()];
+}
+
+function toBool(value: unknown, fallback = false): boolean {
+  if (value === true || value === 1 || value === "1" || value === "true") {
+    return true;
+  }
+  if (value === false || value === 0 || value === "0" || value === "false") {
+    return false;
+  }
+  return fallback;
+}
+
+function normalizeImportedMilestone(
+  m: ExportData["milestones"][number],
+  mapId: string
+) {
+  const legacy = m as typeof m & {
+    mapId?: string;
+    narrativeIds?: string[];
+    narrativeId?: string | null;
+    narrative_id?: string | null;
+    is_personal?: boolean | number | string;
+    is_fuzzy?: boolean | number | string;
+    is_speculative?: boolean | number | string;
+    target_date?: string;
+    fuzzy_range_months?: number;
+    linked_fragment_id?: string | null;
+    created_at?: string;
+  };
+
+  return {
+    id: legacy.id,
+    mapId,
+    title: legacy.title,
+    description: legacy.description ?? null,
+    targetDate: legacy.targetDate ?? legacy.target_date!,
+    isFuzzy: toBool(legacy.isFuzzy ?? legacy.is_fuzzy),
+    fuzzyRangeMonths: legacy.fuzzyRangeMonths ?? legacy.fuzzy_range_months ?? 3,
+    isPersonal: toBool(legacy.isPersonal ?? legacy.is_personal),
+    isSpeculative: toBool(legacy.isSpeculative ?? legacy.is_speculative),
+    hemisphere: legacy.hemisphere,
+    linkedFragmentId: legacy.linkedFragmentId ?? legacy.linked_fragment_id ?? null,
+    createdAt: legacy.createdAt ?? legacy.created_at ?? new Date().toISOString(),
+  };
+}
+
+function normalizeImportedNote(n: NonNullable<ExportData["notes"]>[number], mapId: string) {
+  const legacy = n as typeof n & {
+    mapId?: string;
+    is_personal?: boolean | number | string;
+    pinned_date?: string | null;
+    created_at?: string;
+    updated_at?: string;
+  };
+
+  return {
+    id: legacy.id,
+    mapId,
+    title: legacy.title ?? "Untitled",
+    content: legacy.content ?? "",
+    isPersonal: toBool(legacy.isPersonal ?? legacy.is_personal),
+    pinnedDate: legacy.pinnedDate ?? legacy.pinned_date ?? null,
+    hemisphere: legacy.hemisphere ?? null,
+    createdAt: legacy.createdAt ?? legacy.created_at ?? new Date().toISOString(),
+    updatedAt:
+      legacy.updatedAt ??
+      legacy.updated_at ??
+      legacy.createdAt ??
+      legacy.created_at ??
+      new Date().toISOString(),
+  };
+}
+
+export async function loadExportIntoDb(
+  db: AppDatabase,
+  mapId: string,
+  data: ExportData
+) {
+  const milestoneNarrativeRows = collectMilestoneNarrativeRows(data);
+
+  await db.transaction(async (tx) => {
+    await tx.delete(aiNewsSignals).where(eq(aiNewsSignals.mapId, mapId));
+    await tx.delete(notes).where(eq(notes.mapId, mapId));
+    await tx
+      .delete(milestoneSuggestions)
+      .where(eq(milestoneSuggestions.mapId, mapId));
+    await tx.delete(milestones).where(eq(milestones.mapId, mapId));
+    await tx.delete(fragments).where(eq(fragments.mapId, mapId));
+    await tx.delete(rssFeeds).where(eq(rssFeeds.mapId, mapId));
+    await tx.delete(narratives).where(eq(narratives.mapId, mapId));
+
+    for (const n of data.narratives ?? []) {
+      const { mapId: _omit, ...rest } = n as typeof n & { mapId?: string };
+      await tx.insert(narratives).values({ ...rest, mapId });
+    }
+    for (const f of data.fragments ?? []) {
+      const { mapId: _omit, ...rest } = f as typeof f & { mapId?: string };
+      await tx.insert(fragments).values({ ...rest, mapId });
+    }
+    for (const fn of data.fragmentNarratives ?? []) {
+      const legacy = fn as typeof fn & {
+        fragment_id?: string;
+        narrative_id?: string;
+      };
+      await tx.insert(fragmentNarratives).values({
+        fragmentId: fn.fragmentId ?? legacy.fragment_id!,
+        narrativeId: fn.narrativeId ?? legacy.narrative_id!,
+      });
+    }
+
+    for (const m of data.milestones ?? []) {
+      await tx.insert(milestones).values(normalizeImportedMilestone(m, mapId));
+    }
+
+    if (milestoneNarrativeRows.length > 0) {
+      await tx.insert(milestoneNarratives).values(milestoneNarrativeRows);
+    }
+
+    for (const s of data.aiNewsSignals ?? []) {
+      const { mapId: _omit, ...rest } = s as typeof s & { mapId?: string };
+      await tx.insert(aiNewsSignals).values({ ...rest, mapId });
+    }
+    for (const f of data.rssFeeds ?? []) {
+      const { mapId: _omit, ...rest } = f as typeof f & { mapId?: string };
+      await tx.insert(rssFeeds).values({ ...rest, mapId });
+    }
+    for (const n of data.notes ?? []) {
+      await tx.insert(notes).values(normalizeImportedNote(n, mapId));
+    }
+    for (const s of data.milestoneSuggestions ?? []) {
+      const { mapId: _omit, ...rest } = s as typeof s & { mapId?: string };
+      await tx.insert(milestoneSuggestions).values({ ...rest, mapId });
+    }
+  });
 }

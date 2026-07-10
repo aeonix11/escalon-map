@@ -27,7 +27,7 @@ export default function AddMilestoneForm({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [targetDate, setTargetDate] = useState("2026-06-01");
-  const [narrativeId, setNarrativeId] = useState("");
+  const [narrativeIds, setNarrativeIds] = useState<string[]>([]);
   const [linkedFragmentId, setLinkedFragmentId] = useState("");
   const [hemisphere, setHemisphere] = useState<"UPPER_PROPHETIC" | "LOWER_EARTHLY">(
     "UPPER_PROPHETIC"
@@ -54,7 +54,7 @@ export default function AddMilestoneForm({
           title,
           description,
           targetDate,
-          narrativeId: narrativeId || null,
+          narrativeIds,
           linkedFragmentId: linkedFragmentId || null,
           hemisphere,
           isFuzzy,
@@ -104,16 +104,37 @@ export default function AddMilestoneForm({
         max={`${TIMELINE_END_YEAR}-12-31`}
         className={`${inputClass} mb-2`}
       />
-      <select
-        value={narrativeId}
-        onChange={(e) => setNarrativeId(e.target.value)}
-        className={`${inputClass} mb-2`}
-      >
-        <option value="">No narrative</option>
-        {narratives.map((n) => (
-          <option key={n.id} value={n.id}>{n.title}</option>
-        ))}
-      </select>
+      <div className="mb-2">
+        <p className="mb-1 text-[10px] text-slate-500">Narratives (optional)</p>
+        <div className="flex flex-wrap gap-1">
+          {narratives.map((n) => {
+            const selected = narrativeIds.includes(n.id);
+            return (
+              <button
+                key={n.id}
+                type="button"
+                onClick={() =>
+                  setNarrativeIds((prev) =>
+                    selected
+                      ? prev.filter((id) => id !== n.id)
+                      : [...prev, n.id]
+                  )
+                }
+                className={`rounded px-2 py-0.5 text-[10px] border ${
+                  selected ? "ring-1" : "opacity-60"
+                }`}
+                style={{
+                  backgroundColor: n.colorHex + "30",
+                  color: n.colorHex,
+                  borderColor: n.colorHex + "55",
+                }}
+              >
+                {n.title}
+              </button>
+            );
+          })}
+        </div>
+      </div>
       <label className="mb-1 block text-[10px] text-slate-500">
         Link video source (optional)
       </label>

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useMapStore } from "@/store/mapStore";
 import { formatTimestamp, TIMELINE_END_YEAR, TIMELINE_START_YEAR } from "@/lib/types";
 import { inputClass } from "@/components/forms/formStyles";
-import type { Fragment, Milestone, MilestoneSuggestion } from "@/lib/schema";
+import type { Fragment, MilestoneWithNarratives, MilestoneSuggestion } from "@/lib/schema";
 
 interface DetailContextDrawerProps {
   onRefresh: () => void;
@@ -16,12 +16,12 @@ function fragmentLabel(f: Fragment): string {
   return `${formatTimestamp(f.timestampSeconds)} · ${f.speaker} — ${preview}`;
 }
 
-function loadFormFromMilestone(m: Milestone) {
+function loadFormFromMilestone(m: MilestoneWithNarratives) {
   return {
     title: m.title,
     description: m.description ?? "",
     targetDate: m.targetDate,
-    narrativeId: m.narrativeId ?? "",
+    narrativeIds: m.narrativeIds ?? [],
     linkedFragmentId: m.linkedFragmentId ?? "",
     hemisphere: m.hemisphere,
     isFuzzy: m.isFuzzy,
@@ -68,7 +68,7 @@ export default function DetailContextDrawer({ onRefresh }: DetailContextDrawerPr
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [targetDate, setTargetDate] = useState("");
-  const [narrativeId, setNarrativeId] = useState("");
+  const [narrativeIds, setNarrativeIds] = useState<string[]>([]);
   const [linkedFragmentId, setLinkedFragmentId] = useState("");
   const [hemisphere, setHemisphere] = useState<"UPPER_PROPHETIC" | "LOWER_EARTHLY">(
     "UPPER_PROPHETIC"
@@ -82,9 +82,9 @@ export default function DetailContextDrawer({ onRefresh }: DetailContextDrawerPr
   const suggestion = milestoneSuggestions.find(
     (s) => s.id === selectedSuggestionId
   );
-  const narrative = milestone?.narrativeId
-    ? narratives.find((n) => n.id === milestone.narrativeId)
-    : null;
+  const linkedNarratives = milestone
+    ? narratives.filter((n) => milestone.narrativeIds.includes(n.id))
+    : [];
   const linkedFragment = milestone?.linkedFragmentId
     ? fragments.find((f) => f.id === milestone.linkedFragmentId)
     : null;
@@ -103,7 +103,7 @@ export default function DetailContextDrawer({ onRefresh }: DetailContextDrawerPr
       setTitle(form.title);
       setDescription(form.description);
       setTargetDate(form.targetDate);
-      setNarrativeId(form.narrativeId);
+      setNarrativeIds(form.narrativeIds);
       setLinkedFragmentId(form.linkedFragmentId);
       setHemisphere(form.hemisphere);
       setIsFuzzy(form.isFuzzy);
@@ -145,7 +145,7 @@ export default function DetailContextDrawer({ onRefresh }: DetailContextDrawerPr
           id: milestone.id,
           data: {
             title, description, targetDate,
-            narrativeId: narrativeId || null,
+            narrativeIds,
             linkedFragmentId: linkedFragmentId || null,
             hemisphere, isFuzzy, fuzzyRangeMonths, isPersonal, isSpeculative,
           },
@@ -361,11 +361,35 @@ export default function DetailContextDrawer({ onRefresh }: DetailContextDrawerPr
             <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} min={`${TIMELINE_START_YEAR}-01-01`} max={`${TIMELINE_END_YEAR}-12-31`} className={inputClass} required />
           </div>
           <div>
-            <label className="mb-1 block text-[10px] uppercase tracking-widest text-slate-400">Narrative</label>
-            <select value={narrativeId} onChange={(e) => setNarrativeId(e.target.value)} className={inputClass}>
-              <option value="">No narrative</option>
-              {narratives.map((n) => <option key={n.id} value={n.id}>{n.title}</option>)}
-            </select>
+            <label className="mb-1 block text-[10px] uppercase tracking-widest text-slate-400">Narratives</label>
+            <div className="flex flex-wrap gap-1.5">
+              {narratives.map((n) => {
+                const selected = narrativeIds.includes(n.id);
+                return (
+                  <button
+                    key={n.id}
+                    type="button"
+                    onClick={() =>
+                      setNarrativeIds((prev) =>
+                        selected
+                          ? prev.filter((id) => id !== n.id)
+                          : [...prev, n.id]
+                      )
+                    }
+                    className={`rounded px-2 py-1 text-xs border ${
+                      selected ? "ring-2 ring-offset-1" : "opacity-60"
+                    }`}
+                    style={{
+                      backgroundColor: n.colorHex + "30",
+                      color: n.colorHex,
+                      borderColor: n.colorHex + "55",
+                    }}
+                  >
+                    {n.title}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <div>
             <label className="mb-1 block text-[10px] uppercase tracking-widest text-slate-400">Video source</label>
@@ -410,7 +434,7 @@ export default function DetailContextDrawer({ onRefresh }: DetailContextDrawerPr
                 setError(null);
                 const form = loadFormFromMilestone(milestone);
                 setTitle(form.title); setDescription(form.description); setTargetDate(form.targetDate);
-                setNarrativeId(form.narrativeId); setLinkedFragmentId(form.linkedFragmentId);
+                setNarrativeIds(form.narrativeIds); setLinkedFragmentId(form.linkedFragmentId);
                 setHemisphere(form.hemisphere); setIsFuzzy(form.isFuzzy);
                 setFuzzyRangeMonths(form.fuzzyRangeMonths); setIsPersonal(form.isPersonal);
                 setIsSpeculative(form.isSpeculative);
@@ -429,8 +453,8 @@ export default function DetailContextDrawer({ onRefresh }: DetailContextDrawerPr
           <div
             className="rounded-lg border p-4"
             style={{
-              borderColor: narrative?.colorHex ?? "#e2e8f0",
-              backgroundColor: (narrative?.colorHex ?? "#94a3b8") + "0f",
+              borderColor: linkedNarratives[0]?.colorHex ?? "#e2e8f0",
+              backgroundColor: (linkedNarratives[0]?.colorHex ?? "#94a3b8") + "0f",
             }}
           >
             {/* Meta row */}
@@ -469,13 +493,17 @@ export default function DetailContextDrawer({ onRefresh }: DetailContextDrawerPr
             )}
 
             {/* Narrative */}
-            {narrative && (
-              <div className="mt-3 flex items-center gap-1.5">
-                <span
-                  className="h-2.5 w-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: narrative.colorHex }}
-                />
-                <span className="text-xs text-slate-600">{narrative.title}</span>
+            {linkedNarratives.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {linkedNarratives.map((n) => (
+                  <div key={n.id} className="flex items-center gap-1.5">
+                    <span
+                      className="h-2.5 w-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: n.colorHex }}
+                    />
+                    <span className="text-xs text-slate-600">{n.title}</span>
+                  </div>
+                ))}
               </div>
             )}
           </div>

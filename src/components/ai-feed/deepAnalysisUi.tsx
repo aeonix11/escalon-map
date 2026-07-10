@@ -1,6 +1,6 @@
 import type { MapHealthIssue, MapMilestoneSuggestion } from "@/lib/mapAnalysis";
 import { parseStoredSources } from "@/lib/mapAnalysis";
-import type { Milestone, MilestoneSuggestion, SuggestionTier } from "@/lib/schema";
+import type { MilestoneWithNarratives, MilestoneSuggestion, SuggestionTier } from "@/lib/schema";
 import type { DeepModelChoice } from "@/lib/anthropic";
 import { serializeMapContext } from "@/lib/mapSerialize";
 import type { Fragment, Narrative, Note } from "@/lib/schema";
@@ -13,7 +13,7 @@ export function defaultMaxSearches(model: DeepModelChoice): number {
 
 export function estimateContextTokens(
   narratives: Narrative[],
-  milestones: Milestone[],
+  milestones: MilestoneWithNarratives[],
   fragments: Fragment[],
   notes: Note[],
   scopeNarrativeId: string | null,
@@ -25,7 +25,9 @@ export function estimateContextTokens(
 
   if (scopeNarrativeId) {
     scopedNarratives = narratives.filter((n) => n.id === scopeNarrativeId);
-    scopedMilestones = milestones.filter((m) => m.narrativeId === scopeNarrativeId);
+    scopedMilestones = milestones.filter((m) =>
+      m.narrativeIds.includes(scopeNarrativeId)
+    );
     scopedFragments = fragments.filter((f) => fragmentNarrativeIds.has(f.id));
   }
 

@@ -1,21 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { narratives, milestones, fragments, fragmentNarratives, notes } from "@/lib/schema";
 import { eq } from "drizzle-orm";
+import {
+  narratives,
+  milestones,
+  fragments,
+  fragmentNarratives,
+  notes,
+  milestoneNarratives,
+} from "@/lib/schema";
 import { nowIso } from "@/lib/types";
 import { embedText, embeddingToBuffer } from "@/lib/voyage";
-import {
-  persistIfEditable,
-  readOnlyResponse,
-  resolveMapContext,
-} from "@/lib/mapContext";
+import { readOnlyResponse, resolveOwnerMapContext } from "@/lib/mapContext";
+import { setMilestoneNarratives } from "@/lib/mapData";
 
 export async function POST(req: NextRequest) {
-  const ctx = await resolveMapContext();
+  const ctx = await resolveOwnerMapContext();
   if (!ctx.editable) return readOnlyResponse();
 
   const db = ctx.db;
   const body = await req.json();
   const { type, data } = body;
+  const mapId = ctx.mapId;
 
   if (type === "narrative") {
     const id = crypto.randomUUID();
@@ -24,13 +29,13 @@ export async function POST(req: NextRequest) {
     );
     await db.insert(narratives).values({
       id,
+      mapId,
       title: data.title,
       description: data.description ?? null,
       colorHex: data.colorHex ?? "#3b82f6",
       embedding: embedding ? embeddingToBuffer(embedding) : null,
       createdAt: nowIso(),
     });
-    persistIfEditable(ctx);
     return NextResponse.json({ id });
   }
 
@@ -39,6 +44,7 @@ export async function POST(req: NextRequest) {
     const embedding = await embedText(data.rawText);
     await db.insert(fragments).values({
       id,
+      mapId,
       sourceUrl: data.sourceUrl,
       timestampSeconds: data.timestampSeconds,
       speaker: data.speaker,
@@ -54,7 +60,6 @@ export async function POST(req: NextRequest) {
         });
       }
     }
-    persistIfEditable(ctx);
     return NextResponse.json({ id });
   }
 
@@ -72,9 +77,13 @@ export async function POST(req: NextRequest) {
 
     try {
       const id = crypto.randomUUID();
+      const narrativeIds: string[] =
+        data.narrativeIds ??
+        (data.narrativeId ? [data.narrativeId] : []);
+
       await db.insert(milestones).values({
         id,
-        narrativeId: data.narrativeId ?? null,
+        mapId,
         title: data.title,
         description: data.description ?? null,
         targetDate: data.targetDate,
@@ -86,7 +95,10 @@ export async function POST(req: NextRequest) {
         linkedFragmentId: data.linkedFragmentId ?? null,
         createdAt: nowIso(),
       });
-      persistIfEditable(ctx);
+
+      if (narrativeIds.length > 0) {
+        await setMilestoneNarratives(id, narrativeIds);
+      }
 
       const [created] = await db
         .select()
@@ -101,7 +113,10 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      return NextResponse.json({ id, milestone: created });
+      return NextResponse.json({
+        id,
+        milestone: { ...created, narrativeIds },
+      });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Insert failed";
       return NextResponse.json({ error: msg }, { status: 500 });
@@ -113,6 +128,7 @@ export async function POST(req: NextRequest) {
     const ts = nowIso();
     await db.insert(notes).values({
       id,
+      mapId,
       title: data.title,
       content: data.content ?? "",
       isPersonal: data.isPersonal ?? false,
@@ -121,7 +137,6 @@ export async function POST(req: NextRequest) {
       createdAt: ts,
       updatedAt: ts,
     });
-    persistIfEditable(ctx);
     return NextResponse.json({ id });
   }
 

@@ -60,6 +60,7 @@ export async function upsertFeedItems(
 
     await db.insert(aiNewsSignals).values({
       id: crypto.randomUUID(),
+      mapId: feed.mapId,
       title: item.title,
       summary: item.description,
       sourceName: feed.label,

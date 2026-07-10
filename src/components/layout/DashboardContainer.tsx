@@ -62,8 +62,14 @@ export default function DashboardContainer() {
       activeMapId: data.activeMapId,
       activeMapName: activeMap?.name ?? "My Map",
       readOnly: data.readOnly,
+      shareSlug: activeMap?.shareSlug ?? null,
+      visibility: activeMap?.visibility ?? "private",
       availableMaps: data.maps,
+      viewerLoggedIn: true,
     });
+    if (data.narrativeFocusMode) {
+      useMapStore.getState().setNarrativeFocusMode(data.narrativeFocusMode);
+    }
   };
 
   const loadData = async () => {
@@ -254,11 +260,7 @@ export default function DashboardContainer() {
 
       {readOnly && (
         <div className="border-b border-amber-200 bg-amber-50 px-6 py-2 text-center text-xs text-amber-900">
-          You are viewing a shared map — read only. Switch to <strong>My Map</strong> in{" "}
-          <Link href="/settings" className="underline">
-            Settings
-          </Link>{" "}
-          to edit your own timeline.
+          You are viewing a shared map — read only.
         </div>
       )}
 

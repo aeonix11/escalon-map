@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { milestones, milestoneSuggestions } from "@/lib/schema";
-import {
-  persistIfEditable,
-  readOnlyResponse,
-  resolveMapContext,
-} from "@/lib/mapContext";
+import { readOnlyResponse, resolveOwnerMapContext } from "@/lib/mapContext";
+import { setMilestoneNarratives } from "@/lib/mapData";
 
 export async function POST(req: NextRequest) {
-  const ctx = await resolveMapContext();
+  const ctx = await resolveOwnerMapContext();
   if (!ctx.editable) return readOnlyResponse();
 
   const body = await req.json();
@@ -23,12 +20,12 @@ export async function POST(req: NextRequest) {
       .select()
       .from(milestoneSuggestions)
       .where(eq(milestoneSuggestions.id, id));
-    if (!suggestion) continue;
+    if (!suggestion || suggestion.mapId !== ctx.mapId) continue;
 
     const milestoneId = crypto.randomUUID();
     await ctx.db.insert(milestones).values({
       id: milestoneId,
-      narrativeId: suggestion.narrativeId,
+      mapId: ctx.mapId,
       title: suggestion.title,
       description: suggestion.description,
       targetDate: suggestion.targetDate,
@@ -40,12 +37,16 @@ export async function POST(req: NextRequest) {
       linkedFragmentId: null,
       createdAt: new Date().toISOString(),
     });
+
+    if (suggestion.narrativeId) {
+      await setMilestoneNarratives(milestoneId, [suggestion.narrativeId]);
+    }
+
     await ctx.db
       .delete(milestoneSuggestions)
       .where(eq(milestoneSuggestions.id, id));
     created.push(milestoneId);
   }
 
-  persistIfEditable(ctx);
   return NextResponse.json({ ok: true, created: created.length, ids: created });
 }

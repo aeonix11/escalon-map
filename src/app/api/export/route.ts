@@ -1,54 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import {
-  narratives,
-  milestones,
-  fragments,
-  fragmentNarratives,
-  aiNewsSignals,
-  rssFeeds,
-  notes,
-} from "@/lib/schema";
-import type { ExportData } from "@/lib/types";
 import { nowIso } from "@/lib/types";
-import { getMapEntry } from "@/lib/maps";
-import { initDb } from "@/lib/db";
-import { resolveMapContext } from "@/lib/mapContext";
+import type { ExportData } from "@/lib/types";
+import { fetchMapPayload } from "@/lib/mapData";
+import { resolveOwnerMapContext } from "@/lib/mapContext";
 
 export async function GET(req: NextRequest) {
-  const forcedMapId = req.nextUrl.searchParams.get("mapId");
-  const ctx = forcedMapId ? null : await resolveMapContext();
-  const mapId = forcedMapId ?? ctx!.mapId;
-  const entry = getMapEntry(mapId) ?? ctx!.entry;
-  const db = await initDb(mapId);
-
+  const ctx = await resolveOwnerMapContext();
   const includePersonal =
     req.nextUrl.searchParams.get("includePersonal") === "true";
 
+  const payload = await fetchMapPayload(ctx.mapId);
+
   const allMilestones = includePersonal
-    ? await db.select().from(milestones)
-    : await db
-        .select()
-        .from(milestones)
-        .where(eq(milestones.isPersonal, false));
+    ? payload.milestones
+    : payload.milestones.filter((m) => !m.isPersonal);
 
   const allNotes = includePersonal
-    ? await db.select().from(notes)
-    : await db.select().from(notes).where(eq(notes.isPersonal, false));
+    ? payload.notes
+    : payload.notes.filter((n) => !n.isPersonal);
+
+  const milestoneNarratives = allMilestones.flatMap((m) =>
+    m.narrativeIds.map((narrativeId) => ({
+      milestoneId: m.id,
+      narrativeId,
+    }))
+  );
 
   const data: ExportData = {
-    version: 1,
+    version: 2,
     exportedAt: nowIso(),
-    narratives: await db.select().from(narratives),
-    fragments: await db.select().from(fragments),
-    fragmentNarratives: await db.select().from(fragmentNarratives),
-    milestones: allMilestones,
-    aiNewsSignals: await db.select().from(aiNewsSignals),
-    rssFeeds: await db.select().from(rssFeeds),
+    narratives: payload.narratives,
+    fragments: payload.fragments,
+    fragmentNarratives: payload.fragmentNarratives,
+    milestoneNarratives,
+    milestones: allMilestones.map(({ narrativeIds: _n, ...m }) => m),
+    milestoneSuggestions: payload.milestoneSuggestions,
+    aiNewsSignals: payload.signals,
+    rssFeeds: payload.feeds,
     notes: allNotes,
   };
 
-  const safeName = entry.name.replace(/[^a-z0-9-_]+/gi, "-").toLowerCase();
+  const safeName = ctx.map.name.replace(/[^a-z0-9-_]+/gi, "-").toLowerCase();
 
   return new NextResponse(JSON.stringify(data, null, 2), {
     headers: {

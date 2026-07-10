@@ -1,7 +1,14 @@
 import { create } from "zustand";
-import type { Fragment, Milestone, Narrative, Note, MilestoneSuggestion } from "@/lib/schema";
+import type {
+  Fragment,
+  Narrative,
+  Note,
+  MilestoneSuggestion,
+  MilestoneWithNarratives,
+} from "@/lib/schema";
 
-export type DrawerMode = "detail" | "intelligence" | "notes" | null;
+export type DrawerMode = "detail" | "intelligence" | "notes" | "comments" | null;
+export type NarrativeFocusMode = "fade" | "hide";
 
 export interface MapSummary {
   id: string;
@@ -9,12 +16,15 @@ export interface MapSummary {
   editable: boolean;
   ownerLabel: string | null;
   kind: "database" | "snapshot";
+  visibility?: "private" | "public";
+  shareSlug?: string;
 }
 
 interface MapState {
   zoomScale: number;
   activeNarrativeId: string | null;
   hidePersonalMilestones: boolean;
+  narrativeFocusMode: NarrativeFocusMode;
   drawerMode: DrawerMode;
   selectedMilestoneId: string | null;
   selectedSuggestionId: string | null;
@@ -24,17 +34,21 @@ interface MapState {
   videoModalUrl: string | null;
   videoModalFragments: Fragment[];
   narratives: Narrative[];
-  milestones: Milestone[];
+  milestones: MilestoneWithNarratives[];
   milestoneSuggestions: MilestoneSuggestion[];
   fragments: Fragment[];
   notes: Note[];
   activeMapId: string;
   activeMapName: string;
   readOnly: boolean;
+  shareSlug: string | null;
+  visibility: "private" | "public";
   availableMaps: MapSummary[];
+  viewerLoggedIn: boolean;
   setZoomScale: (scale: number) => void;
   setActiveNarrativeId: (id: string | null) => void;
   toggleHidePersonalMilestones: () => void;
+  setNarrativeFocusMode: (mode: NarrativeFocusMode) => void;
   setDrawerMode: (mode: DrawerMode) => void;
   setSelectedMilestoneId: (id: string | null) => void;
   setSelectedSuggestionId: (id: string | null) => void;
@@ -45,7 +59,7 @@ interface MapState {
   closeVideoModal: () => void;
   setData: (data: {
     narratives: Narrative[];
-    milestones: Milestone[];
+    milestones: MilestoneWithNarratives[];
     milestoneSuggestions?: MilestoneSuggestion[];
     fragments: Fragment[];
     notes?: Note[];
@@ -54,7 +68,10 @@ interface MapState {
     activeMapId: string;
     activeMapName: string;
     readOnly: boolean;
+    shareSlug?: string | null;
+    visibility?: "private" | "public";
     availableMaps: MapSummary[];
+    viewerLoggedIn?: boolean;
   }) => void;
 }
 
@@ -62,6 +79,7 @@ export const useMapStore = create<MapState>((set) => ({
   zoomScale: 50,
   activeNarrativeId: null,
   hidePersonalMilestones: false,
+  narrativeFocusMode: "fade",
   drawerMode: null,
   selectedMilestoneId: null,
   selectedSuggestionId: null,
@@ -75,15 +93,19 @@ export const useMapStore = create<MapState>((set) => ({
   milestoneSuggestions: [],
   fragments: [],
   notes: [],
-  activeMapId: "my-map",
+  activeMapId: "",
   activeMapName: "My Map",
   readOnly: false,
+  shareSlug: null,
+  visibility: "private",
   availableMaps: [],
+  viewerLoggedIn: false,
   setZoomScale: (scale) => set({ zoomScale: scale }),
   setActiveNarrativeId: (id) =>
     set((s) => ({
       activeNarrativeId: s.activeNarrativeId === id ? null : id,
     })),
+  setNarrativeFocusMode: (mode) => set({ narrativeFocusMode: mode }),
   toggleHidePersonalMilestones: () =>
     set((s) => {
       const hidePersonalMilestones = !s.hidePersonalMilestones;
@@ -147,6 +169,9 @@ export const useMapStore = create<MapState>((set) => ({
       activeMapId: ctx.activeMapId,
       activeMapName: ctx.activeMapName,
       readOnly: ctx.readOnly,
+      shareSlug: ctx.shareSlug ?? null,
+      visibility: ctx.visibility ?? "private",
       availableMaps: ctx.availableMaps,
+      viewerLoggedIn: ctx.viewerLoggedIn ?? false,
     }),
 }));

@@ -8,6 +8,7 @@ const MAX_HISTORY_RUNS = 30;
 
 export async function saveDeepAnalysisRun(
   db: AppDatabase,
+  mapId: string,
   analysis: string,
   suggestions: MapMilestoneSuggestion[],
   model: string,
@@ -22,6 +23,7 @@ export async function saveDeepAnalysisRun(
   const now = new Date().toISOString();
   await db.insert(deepAnalysisRuns).values({
     id: crypto.randomUUID(),
+    mapId,
     analysisText: analysis.trim(),
     suggestionsJson: JSON.stringify(suggestions),
     healthJson: JSON.stringify(options.health ?? []),
@@ -35,6 +37,7 @@ export async function saveDeepAnalysisRun(
   const rows = await db
     .select({ id: deepAnalysisRuns.id })
     .from(deepAnalysisRuns)
+    .where(eq(deepAnalysisRuns.mapId, mapId))
     .orderBy(desc(deepAnalysisRuns.createdAt));
 
   if (rows.length > MAX_HISTORY_RUNS) {

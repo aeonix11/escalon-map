@@ -8,14 +8,10 @@ import {
   embedText,
   embeddingToBuffer,
 } from "@/lib/voyage";
-import {
-  persistIfEditable,
-  readOnlyResponse,
-  resolveMapContext,
-} from "@/lib/mapContext";
+import { readOnlyResponse, resolveOwnerMapContext } from "@/lib/mapContext";
 
 export async function POST(req: NextRequest) {
-  const ctx = await resolveMapContext();
+  const ctx = await resolveOwnerMapContext();
   if (!ctx.editable) return readOnlyResponse();
 
   const db = ctx.db;
@@ -27,11 +23,14 @@ export async function POST(req: NextRequest) {
     .where(eq(aiNewsSignals.id, signalId))
     .limit(1);
 
-  if (!signal) {
+  if (!signal || signal.mapId !== ctx.mapId) {
     return NextResponse.json({ error: "Signal not found" }, { status: 404 });
   }
 
-  const allNarratives = await db.select().from(narratives);
+  const allNarratives = await db
+    .select()
+    .from(narratives)
+    .where(eq(narratives.mapId, ctx.mapId));
 
   let signalEmbedding: Float32Array | null = null;
   if (signal.embedding) {
@@ -89,8 +88,6 @@ export async function POST(req: NextRequest) {
       reasoningNote: result.reasoning,
     })
     .where(eq(aiNewsSignals.id, signalId));
-
-  persistIfEditable(ctx);
 
   return NextResponse.json({
     matched: result.matched,

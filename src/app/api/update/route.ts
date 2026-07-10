@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { milestones, notes } from "@/lib/schema";
-import {
-  persistIfEditable,
-  readOnlyResponse,
-  resolveMapContext,
-} from "@/lib/mapContext";
+import { readOnlyResponse, resolveOwnerMapContext } from "@/lib/mapContext";
+import { setMilestoneNarratives } from "@/lib/mapData";
 
 export async function POST(req: NextRequest) {
-  const ctx = await resolveMapContext();
+  const ctx = await resolveOwnerMapContext();
   if (!ctx.editable) return readOnlyResponse();
 
   const db = ctx.db;
@@ -25,7 +22,6 @@ export async function POST(req: NextRequest) {
   if (type === "milestone") {
     const updates: Partial<{
       linkedFragmentId: string | null;
-      narrativeId: string | null;
       title: string;
       description: string | null;
       targetDate: string;
@@ -38,9 +34,6 @@ export async function POST(req: NextRequest) {
 
     if ("linkedFragmentId" in data) {
       updates.linkedFragmentId = data.linkedFragmentId ?? null;
-    }
-    if ("narrativeId" in data) {
-      updates.narrativeId = data.narrativeId ?? null;
     }
     if ("title" in data) {
       if (!data.title?.trim()) {
@@ -80,7 +73,10 @@ export async function POST(req: NextRequest) {
       updates.fuzzyRangeMonths = months;
     }
 
-    if (Object.keys(updates).length === 0) {
+    const hasNarrativeUpdate =
+      "narrativeIds" in data || "narrativeId" in data;
+
+    if (Object.keys(updates).length === 0 && !hasNarrativeUpdate) {
       return NextResponse.json({ error: "No updates provided" }, { status: 400 });
     }
 
@@ -90,12 +86,22 @@ export async function POST(req: NextRequest) {
       .where(eq(milestones.id, id))
       .limit(1);
 
-    if (!existing) {
+    if (!existing || existing.mapId !== ctx.mapId) {
       return NextResponse.json({ error: "Milestone not found" }, { status: 404 });
     }
 
-    await db.update(milestones).set(updates).where(eq(milestones.id, id));
-    persistIfEditable(ctx);
+    if (Object.keys(updates).length > 0) {
+      await db.update(milestones).set(updates).where(eq(milestones.id, id));
+    }
+
+    let narrativeIds: string[] | undefined;
+    if ("narrativeIds" in data) {
+      narrativeIds = Array.isArray(data.narrativeIds) ? data.narrativeIds : [];
+      await setMilestoneNarratives(id, narrativeIds);
+    } else if ("narrativeId" in data) {
+      narrativeIds = data.narrativeId ? [data.narrativeId] : [];
+      await setMilestoneNarratives(id, narrativeIds);
+    }
 
     const [updated] = await db
       .select()
@@ -103,7 +109,13 @@ export async function POST(req: NextRequest) {
       .where(eq(milestones.id, id))
       .limit(1);
 
-    return NextResponse.json({ ok: true, milestone: updated });
+    return NextResponse.json({
+      ok: true,
+      milestone: {
+        ...updated,
+        narrativeIds: narrativeIds ?? undefined,
+      },
+    });
   }
 
   if (type === "note") {
@@ -148,12 +160,11 @@ export async function POST(req: NextRequest) {
       .where(eq(notes.id, id))
       .limit(1);
 
-    if (!existing) {
+    if (!existing || existing.mapId !== ctx.mapId) {
       return NextResponse.json({ error: "Note not found" }, { status: 404 });
     }
 
     await db.update(notes).set(updates).where(eq(notes.id, id));
-    persistIfEditable(ctx);
 
     const [updated] = await db
       .select()

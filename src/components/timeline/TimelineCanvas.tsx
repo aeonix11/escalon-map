@@ -50,6 +50,7 @@ export default function TimelineCanvas() {
     zoomScale,
     activeNarrativeId,
     hidePersonalMilestones,
+    narrativeFocusMode,
     setSelectedMilestoneId,
     setSelectedSuggestionId,
     setSelectedNoteId,
@@ -57,19 +58,40 @@ export default function TimelineCanvas() {
     setZoomScale,
   } = useMapStore();
 
-  const layoutMilestones = useMemo(
-    () =>
-      hidePersonalMilestones
-        ? milestones.filter((m) => !m.isPersonal)
-        : milestones,
-    [milestones, hidePersonalMilestones]
-  );
+  const layoutMilestones = useMemo(() => {
+    let items = hidePersonalMilestones
+      ? milestones.filter((m) => !m.isPersonal)
+      : milestones;
+
+    if (
+      activeNarrativeId &&
+      narrativeFocusMode === "hide"
+    ) {
+      items = items.filter((m) =>
+        m.narrativeIds.includes(activeNarrativeId)
+      );
+    }
+
+    return items;
+  }, [milestones, hidePersonalMilestones, activeNarrativeId, narrativeFocusMode]);
 
   const layoutNotes = useMemo(
     () =>
       hidePersonalMilestones ? notes.filter((n) => !n.isPersonal) : notes,
     [notes, hidePersonalMilestones]
   );
+
+  const layoutSuggestions = useMemo(() => {
+    if (
+      activeNarrativeId &&
+      narrativeFocusMode === "hide"
+    ) {
+      return milestoneSuggestions.filter(
+        (s) => s.narrativeId === activeNarrativeId
+      );
+    }
+    return milestoneSuggestions;
+  }, [milestoneSuggestions, activeNarrativeId, narrativeFocusMode]);
 
   const {
     milestones: computed,
@@ -78,7 +100,7 @@ export default function TimelineCanvas() {
     maxLowerLane: maxMilestoneLowerLane,
   } = useTimelineLayout(
     layoutMilestones,
-    milestoneSuggestions,
+    layoutSuggestions,
     narratives,
     zoomScale,
     activeNarrativeId

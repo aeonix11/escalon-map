@@ -36,6 +36,9 @@ export async function PUT(req: NextRequest) {
 
   const current = readSettings();
   writeSettings({
+    activeMapId: current.activeMapId,
+    anthropicApiKey: current.anthropicApiKey,
+    voyageApiKey: current.voyageApiKey,
     deepAnalysisQuickPrompt: body.resetQuick
       ? ""
       : body.quickPrompt !== undefined

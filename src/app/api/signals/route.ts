@@ -3,20 +3,20 @@ import { eq } from "drizzle-orm";
 import { aiNewsSignals, milestones } from "@/lib/schema";
 import { embedText, embeddingToBuffer } from "@/lib/voyage";
 import { nowIso } from "@/lib/types";
-import {
-  persistIfEditable,
-  readOnlyResponse,
-  resolveMapContext,
-} from "@/lib/mapContext";
+import { readOnlyResponse, resolveOwnerMapContext } from "@/lib/mapContext";
+import { setMilestoneNarratives } from "@/lib/mapData";
 
 export async function GET() {
-  const ctx = await resolveMapContext();
-  const signals = await ctx.db.select().from(aiNewsSignals);
+  const ctx = await resolveOwnerMapContext();
+  const signals = await ctx.db
+    .select()
+    .from(aiNewsSignals)
+    .where(eq(aiNewsSignals.mapId, ctx.mapId));
   return NextResponse.json(signals);
 }
 
 export async function POST(req: NextRequest) {
-  const ctx = await resolveMapContext();
+  const ctx = await resolveOwnerMapContext();
   if (!ctx.editable) return readOnlyResponse();
 
   const db = ctx.db;
@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
     );
     await db.insert(aiNewsSignals).values({
       id,
+      mapId: ctx.mapId,
       title: body.title,
       summary: body.summary ?? null,
       sourceName: body.sourceName ?? null,
@@ -38,7 +39,6 @@ export async function POST(req: NextRequest) {
       status: "PENDING",
       createdAt: nowIso(),
     });
-    persistIfEditable(ctx);
     return NextResponse.json({ id });
   }
 
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     const milestoneId = crypto.randomUUID();
     await db.insert(milestones).values({
       id: milestoneId,
-      narrativeId: signal.matchedNarrativeId ?? null,
+      mapId: ctx.mapId,
       title: signal.title,
       description: signal.summary ?? signal.reasoningNote ?? null,
       targetDate: signal.publishedAt?.slice(0, 10) ?? nowIso().slice(0, 10),
@@ -64,12 +64,15 @@ export async function POST(req: NextRequest) {
       createdAt: nowIso(),
     });
 
+    if (signal.matchedNarrativeId) {
+      await setMilestoneNarratives(milestoneId, [signal.matchedNarrativeId]);
+    }
+
     await db
       .update(aiNewsSignals)
       .set({ status: "ACCEPTED" })
       .where(eq(aiNewsSignals.id, body.signalId));
 
-    persistIfEditable(ctx);
     return NextResponse.json({ milestoneId });
   }
 
@@ -78,7 +81,6 @@ export async function POST(req: NextRequest) {
       .update(aiNewsSignals)
       .set({ status: "DISMISSED" })
       .where(eq(aiNewsSignals.id, body.signalId));
-    persistIfEditable(ctx);
     return NextResponse.json({ ok: true });
   }
 

@@ -5,13 +5,10 @@ import {
   parseStoredHealth,
   parseStoredSuggestions,
 } from "@/lib/deepAnalysisHistory";
-import {
-  persistIfEditable,
-  resolveMapContext,
-} from "@/lib/mapContext";
+import { readOnlyResponse, resolveOwnerMapContext } from "@/lib/mapContext";
 
 export async function GET(req: NextRequest) {
-  const ctx = await resolveMapContext();
+  const ctx = await resolveOwnerMapContext();
   const runId = req.nextUrl.searchParams.get("id");
 
   if (runId) {
@@ -21,7 +18,7 @@ export async function GET(req: NextRequest) {
       .where(eq(deepAnalysisRuns.id, runId))
       .limit(1);
 
-    if (!run) {
+    if (!run || run.mapId !== ctx.mapId) {
       return NextResponse.json({ error: "Run not found" }, { status: 404 });
     }
 
@@ -51,6 +48,7 @@ export async function GET(req: NextRequest) {
       createdAt: deepAnalysisRuns.createdAt,
     })
     .from(deepAnalysisRuns)
+    .where(eq(deepAnalysisRuns.mapId, ctx.mapId))
     .orderBy(desc(deepAnalysisRuns.createdAt));
 
   return NextResponse.json({
@@ -67,10 +65,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const ctx = await resolveMapContext();
-  if (!ctx.editable) {
-    return NextResponse.json({ error: "Read-only map" }, { status: 403 });
-  }
+  const ctx = await resolveOwnerMapContext();
+  if (!ctx.editable) return readOnlyResponse();
 
   const { id } = await req.json();
   if (!id || typeof id !== "string") {
@@ -78,6 +74,5 @@ export async function DELETE(req: NextRequest) {
   }
 
   await ctx.db.delete(deepAnalysisRuns).where(eq(deepAnalysisRuns.id, id));
-  persistIfEditable(ctx);
   return NextResponse.json({ ok: true });
 }

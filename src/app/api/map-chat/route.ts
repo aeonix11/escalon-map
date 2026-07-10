@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import { narratives, milestones, fragments, notes } from "@/lib/schema";
 import { streamMapChat } from "@/lib/anthropic";
 import { formatNoteForRetrieval, serializeMapContext } from "@/lib/mapSerialize";
 import {
@@ -7,28 +6,22 @@ import {
   cosineSimilarity,
   embedQuery,
 } from "@/lib/voyage";
-import { resolveMapContext } from "@/lib/mapContext";
+import { resolveOwnerMapContext } from "@/lib/mapContext";
+import { fetchMapPayload } from "@/lib/mapData";
 
 const TOKEN_THRESHOLD = 120000;
 const CHARS_PER_TOKEN = 4;
 
 export async function POST(req: NextRequest) {
-  const ctx = await resolveMapContext();
-  const db = ctx.db;
+  const ctx = await resolveOwnerMapContext();
   const { question } = await req.json();
-
-  const [allNarratives, allMilestones, allFragments, allNotes] = await Promise.all([
-    db.select().from(narratives),
-    db.select().from(milestones),
-    db.select().from(fragments),
-    db.select().from(notes),
-  ]);
+  const payload = await fetchMapPayload(ctx.mapId);
 
   const fullContext = serializeMapContext(
-    allNarratives,
-    allMilestones,
-    allFragments,
-    allNotes
+    payload.narratives,
+    payload.milestones,
+    payload.fragments,
+    payload.notes
   );
   const estimatedTokens = fullContext.length / CHARS_PER_TOKEN;
 
@@ -39,7 +32,7 @@ export async function POST(req: NextRequest) {
     contextMode = "retrieved";
     const queryEmbedding = await embedQuery(question);
     if (queryEmbedding) {
-      const scoredFragments = allFragments
+      const scoredFragments = payload.fragments
         .filter((f) => f.embedding)
         .map((f) => ({
           text: `[Fragment] ${f.speaker}: ${f.rawText}`,
@@ -51,7 +44,7 @@ export async function POST(req: NextRequest) {
         .sort((a, b) => b.score - a.score)
         .slice(0, 15);
 
-      const scoredNarratives = allNarratives
+      const scoredNarratives = payload.narratives
         .filter((n) => n.embedding)
         .map((n) => ({
           text: `[Narrative] ${n.title}: ${n.description ?? ""}`,
@@ -66,7 +59,7 @@ export async function POST(req: NextRequest) {
       const questionLower = question.toLowerCase();
       const questionWords = questionLower.split(/\s+/).filter(Boolean) as string[];
 
-      const scoredMilestones = allMilestones
+      const scoredMilestones = payload.milestones
         .map((m) => ({
           text: `[Milestone] ${m.targetDate} ${m.hemisphere} ${m.title}: ${m.description ?? ""}`,
           score: 0,
@@ -76,7 +69,7 @@ export async function POST(req: NextRequest) {
         )
         .slice(0, 10);
 
-      const scoredNotes = allNotes
+      const scoredNotes = payload.notes
         .map((n) => ({
           text: formatNoteForRetrieval(n),
           score: 0,
@@ -89,7 +82,7 @@ export async function POST(req: NextRequest) {
       const noteContext =
         scoredNotes.length > 0
           ? scoredNotes
-          : [...allNotes]
+          : [...payload.notes]
               .sort((a, b) =>
                 (b.updatedAt || b.createdAt).localeCompare(
                   a.updatedAt || a.createdAt
