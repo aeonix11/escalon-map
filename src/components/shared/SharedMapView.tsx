@@ -6,6 +6,7 @@ import { useMapStore } from "@/store/mapStore";
 import TimelineCanvas from "@/components/timeline/TimelineCanvas";
 import MapIntelligencePanel from "@/components/ai-feed/MapIntelligencePanel";
 import CommentsPanel from "@/components/comments/CommentsPanel";
+import NarrativeFilterBar from "@/components/shared/NarrativeFilterBar";
 import type { AiNewsSignal, RssFeed } from "@/lib/schema";
 
 interface SharedMapViewProps {
@@ -22,6 +23,9 @@ export default function SharedMapView({ shareSlug }: SharedMapViewProps) {
     activeMapName,
     readOnly,
     viewerLoggedIn,
+    narratives,
+    activeNarrativeId,
+    setActiveNarrativeId,
   } = useMapStore();
 
   const [signals, setSignals] = useState<AiNewsSignal[]>([]);
@@ -54,20 +58,12 @@ export default function SharedMapView({ shareSlug }: SharedMapViewProps) {
         availableMaps: [],
         viewerLoggedIn: Boolean(data.viewer),
       });
+      if (data.narrativeFocusMode) {
+        setNarrativeFocusMode(data.narrativeFocusMode);
+      }
     };
     load();
-  }, [shareSlug, setData, setMapContext]);
-
-  useEffect(() => {
-    fetch("/api/settings")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((s) => {
-        if (s?.narrativeFocusMode) {
-          setNarrativeFocusMode(s.narrativeFocusMode);
-        }
-      })
-      .catch(() => {});
-  }, [setNarrativeFocusMode]);
+  }, [shareSlug, setData, setMapContext, setNarrativeFocusMode]);
 
   return (
     <div className="flex h-screen w-full flex-col bg-slate-50 text-slate-900">
@@ -112,6 +108,14 @@ export default function SharedMapView({ shareSlug }: SharedMapViewProps) {
           )}
         </div>
       </header>
+
+      {!loadError && (
+        <NarrativeFilterBar
+          narratives={narratives}
+          activeNarrativeId={activeNarrativeId}
+          onSelect={setActiveNarrativeId}
+        />
+      )}
 
       {loadError && (
         <div className="border-b border-red-200 bg-red-50 px-6 py-2 text-center text-xs text-red-900">
